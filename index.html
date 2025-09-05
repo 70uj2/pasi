@@ -15,15 +15,12 @@
 <body>
   <input type="color" id="colorPicker" value="#888888" />
 
-  <!-- Three.js -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
 
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-  // === Firebase setup with your config ===
   const firebaseConfig = {
     apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
     authDomain: "pasja-data5100s.firebaseapp.com",
@@ -36,29 +33,24 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // === Three.js setup ===
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
   const renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
-  // Light
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(5, 10, 7);
   scene.add(light);
 
-  // Player cube
   const geometry = new THREE.BoxGeometry();
   const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const player = new THREE.Mesh(geometry, material);
   scene.add(player);
 
-  // Remote players
   const players = {};
   const playerId = Math.random().toString(36).substr(2, 9);
 
-  // === Camera orbit control (custom) ===
   let radius = 5;
   let theta = 0;
   let phi = Math.PI / 4;
@@ -85,7 +77,7 @@
     let dy = e.clientY - lastY;
     theta -= dx * 0.01;
     phi -= dy * 0.01;
-    phi = Math.max(0.1, Math.min(Math.PI-0.1, phi)); // clamp vertical
+    phi = Math.max(0.1, Math.min(Math.PI-0.1, phi));
     updateCamera();
     lastX = e.clientX;
     lastY = e.clientY;
@@ -96,18 +88,15 @@
     updateCamera();
   });
 
-  // === Multiplayer sync ===
   const playerRef = db.ref("players/" + playerId);
   playerRef.set({ x:0, y:0, z:0, color:"#888888" });
   playerRef.onDisconnect().remove();
 
-  // Update player color
   document.getElementById("colorPicker").addEventListener("input", e => {
     player.material.color.set(e.target.value);
     playerRef.update({ color: e.target.value });
   });
 
-  // Listen for remote players
   db.ref("players").on("value", snapshot => {
     const data = snapshot.val() || {};
     for (let id in data) {
@@ -120,7 +109,7 @@
       players[id].material.color.set(data[id].color);
       players[id].position.set(data[id].x, data[id].y, data[id].z);
     }
-    // Remove disconnected players
+
     for (let id in players) {
       if (!data[id]) {
         scene.remove(players[id]);
@@ -129,7 +118,6 @@
     }
   });
 
-  // === Movement keys (WASD) ===
   const keys = {};
   window.addEventListener("keydown", e => keys[e.key] = true);
   window.addEventListener("keyup", e => keys[e.key] = false);
