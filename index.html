@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Character Demo</title>
+  <title>Multiplayer Character with Orbit Camera</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     #colorPicker { position: absolute; top: 10px; left: 10px; z-index: 10; }
@@ -35,15 +35,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+const ambient = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambient);
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 dirLight.position.set(5,10,7);
 dirLight.castShadow = true;
 scene.add(dirLight);
 
-const size = 200, divisions = 20;
-const gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x888888);
+const gridHelper = new THREE.GridHelper(200, 40, 0x444444, 0x888888);
 scene.add(gridHelper);
 
 let playerId = Math.random().toString(36).substr(2,5);
@@ -55,12 +54,10 @@ function createCharacterModel(hex = '#888888') {
 
   const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), baseMat.clone());
   torso.position.set(0, 3, 0);
-  torso.castShadow = true;
   group.add(torso);
 
   const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), baseMat.clone());
   head.position.set(0, 4.625, 0);
-  head.castShadow = true;
   group.add(head);
 
   const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), baseMat.clone());
@@ -79,8 +76,12 @@ function createCharacterModel(hex = '#888888') {
   rightLeg.position.set(0.5, 1, 0);
   group.add(rightLeg);
 
-  const bevelGeom = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-  const bevelPositions = [[-1.5,4,0],[1.5,4,0],[-0.5,0,0],[0.5,0,0]];
+  // bigger bevel cubes pushed outward so they're visible
+  const bevelGeom = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+  const bevelPositions = [
+    [-1.8,4,0],[1.8,4,0],   // shoulders
+    [-0.8,0,0],[0.8,0,0]    // feet
+  ];
   for (const p of bevelPositions) {
     const b = new THREE.Mesh(bevelGeom, baseMat.clone());
     b.position.set(p[0], p[1], p[2]);
@@ -141,13 +142,41 @@ function updatePlayer() {
   });
 }
 
+// ---- custom orbit camera ----
+let isDragging = false;
+let prevMouse = {x:0, y:0};
+let orbit = {yaw:0, pitch:0, dist:10};
+
+renderer.domElement.addEventListener('mousedown', e=>{
+  isDragging = true;
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+renderer.domElement.addEventListener('mouseup', ()=> isDragging=false);
+renderer.domElement.addEventListener('mousemove', e=>{
+  if(!isDragging) return;
+  let dx = e.clientX - prevMouse.x;
+  let dy = e.clientY - prevMouse.y;
+  orbit.yaw -= dx * 0.005;
+  orbit.pitch -= dy * 0.005;
+  orbit.pitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, orbit.pitch));
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+renderer.domElement.addEventListener('wheel', e=>{
+  orbit.dist += e.deltaY*0.01;
+  orbit.dist = Math.max(4, Math.min(30, orbit.dist));
+});
+
 function updateCamera() {
-  const targetPos = new THREE.Vector3(
-    player.position.x,
-    player.position.y + 4,
-    player.position.z + 8
+  const offsetX = orbit.dist * Math.sin(orbit.yaw) * Math.cos(orbit.pitch);
+  const offsetY = orbit.dist * Math.sin(orbit.pitch);
+  const offsetZ = orbit.dist * Math.cos(orbit.yaw) * Math.cos(orbit.pitch);
+  camera.position.set(
+    player.position.x + offsetX,
+    player.position.y + 3 + offsetY,
+    player.position.z + offsetZ
   );
-  camera.position.lerp(targetPos, 0.1);
   camera.lookAt(player.position.x, player.position.y+3, player.position.z);
 }
 
@@ -158,6 +187,12 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
+window.addEventListener("resize",()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
 </script>
 </body>
 </html>
