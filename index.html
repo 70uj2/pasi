@@ -13,146 +13,163 @@
   </style>
 </head>
 <body>
-  <input type="color" id="colorPicker" value="#888888" />
+<input type="color" id="colorPicker" value="#888888" />
 
-  <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-  <script>
-  window.addEventListener("contextmenu", e => e.preventDefault());
+<script>
+window.addEventListener("contextmenu", e => e.preventDefault());
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-    authDomain: "pasja-data5100s.firebaseapp.com",
-    projectId: "pasja-data5100s",
-    storageBucket: "pasja-data5100s.firebasestorage.app",
-    messagingSenderId: "1042573635103",
-    appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-    measurementId: "G-Z2GYGXQTMZ"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+const firebaseConfig = {
+  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+  authDomain: "pasja-data5100s.firebaseapp.com",
+  projectId: "pasja-data5100s",
+  storageBucket: "pasja-data5100s.firebasestorage.app",
+  messagingSenderId: "1042573635103",
+  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+  measurementId: "G-Z2GYGXQTMZ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
-  const player = new THREE.Mesh(geometry, material);
-  player.castShadow = true;
-  scene.add(player);
+const geometry = new THREE.BoxGeometry();
+const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const player = new THREE.Mesh(geometry, material);
+player.castShadow = true;
+scene.add(player);
 
-  const players = {};
-  const playerId = Math.random().toString(36).substr(2, 9);
+const players = {};
+const playerId = Math.random().toString(36).substr(2, 9);
 
-  let radius = 5;
-  let theta = 0;
-  let phi = Math.PI/4;
-  let isDragging = false;
-  let lastX, lastY;
+let radius = 5;
+let theta = 0;
+let phi = Math.PI/4;
+let isDragging = false;
+let lastX, lastY;
 
-  function updateCamera() {
-    const target = player.position;
-    camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
-    camera.position.y = target.y + radius * Math.cos(phi);
-    camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
-    camera.lookAt(target);
-  }
+function updateCamera() {
+  const target = player.position;
+  camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
+  camera.position.y = target.y + radius * Math.cos(phi);
+  camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
+  camera.lookAt(target);
+}
+updateCamera();
+
+window.addEventListener("mousedown", e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener("mouseup", () => isDragging = false);
+window.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+  let dx = e.clientX - lastX;
+  let dy = e.clientY - lastY;
+  theta -= dx * 0.01;
+  phi -= dy * 0.01;
+  phi = Math.max(0.1, Math.min(Math.PI-0.1, phi));
   updateCamera();
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+window.addEventListener("wheel", e => {
+  radius += e.deltaY*0.01;
+  radius = Math.max(2, Math.min(20, radius));
+  updateCamera();
+});
 
-  window.addEventListener("mousedown", e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
-  window.addEventListener("mouseup", () => isDragging = false);
-  window.addEventListener("mousemove", e => {
-    if (!isDragging) return;
-    let dx = e.clientX - lastX;
-    let dy = e.clientY - lastY;
-    theta -= dx * 0.01;
-    phi -= dy * 0.01;
-    phi = Math.max(0.1, Math.min(Math.PI-0.1, phi));
-    updateCamera();
-    lastX = e.clientX;
-    lastY = e.clientY;
-  });
-  window.addEventListener("wheel", e => {
-    radius += e.deltaY*0.01;
-    radius = Math.max(2, Math.min(20, radius));
-    updateCamera();
-  });
+const playerRef = db.ref("players/" + playerId);
+playerRef.set({ x:0, y:0, z:0, color:"#888888" });
+playerRef.onDisconnect().remove();
 
-  const playerRef = db.ref("players/" + playerId);
-  playerRef.set({ x:0, y:0, z:0, color:"#888888" });
-  playerRef.onDisconnect().remove();
+document.getElementById("colorPicker").addEventListener("input", e => {
+  player.material.color.set(e.target.value);
+  playerRef.update({ color:e.target.value });
+});
 
-  document.getElementById("colorPicker").addEventListener("input", e => {
-    player.material.color.set(e.target.value);
-    playerRef.update({ color:e.target.value });
-  });
-
-  db.ref("players").on("value", snapshot => {
-    const data = snapshot.val() || {};
-    for (let id in data) {
-      if (id===playerId) continue;
-      if (!players[id]) {
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color:data[id].color }));
-        mesh.castShadow = true;
-        scene.add(mesh);
-        players[id] = mesh;
-      }
-      players[id].material.color.set(data[id].color);
-      players[id].position.set(data[id].x, data[id].y, data[id].z);
+db.ref("players").on("value", snapshot => {
+  const data = snapshot.val() || {};
+  for (let id in data) {
+    if (id===playerId) continue;
+    if (!players[id]) {
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color:data[id].color }));
+      mesh.castShadow = true;
+      scene.add(mesh);
+      players[id] = mesh;
     }
-    for (let id in players) {
-      if (!data[id]) {
-        scene.remove(players[id]);
-        delete players[id];
-      }
-    }
-  });
-
-  const keys = {};
-  window.addEventListener("keydown", e => keys[e.key]=true);
-  window.addEventListener("keyup", e => keys[e.key]=false);
-
-  const floorSize = 200;
-  const divisions = 40;
-  const gridHelper = new THREE.GridHelper(floorSize, divisions, 0x444444, 0x888888);
-  scene.add(gridHelper);
-
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-  scene.add(ambientLight);
-
-  const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-  sunLight.position.set(50,100,50);
-  sunLight.castShadow = true;
-  sunLight.shadow.mapSize.width = 2048;
-  sunLight.shadow.mapSize.height = 2048;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 500;
-  scene.add(sunLight);
-
-  function animate() {
-    requestAnimationFrame(animate);
-    let moved = false;
-    if (keys["w"]) { player.position.z -= 0.05; moved=true; }
-    if (keys["s"]) { player.position.z += 0.05; moved=true; }
-    if (keys["a"]) { player.position.x -= 0.05; moved=true; }
-    if (keys["d"]) { player.position.x += 0.05; moved=true; }
-    if (moved) playerRef.update({ x:player.position.x, y:player.position.y, z:player.position.z });
-    updateCamera();
-    renderer.render(scene, camera);
+    players[id].material.color.set(data[id].color);
+    players[id].position.set(data[id].x, data[id].y, data[id].z);
   }
-  animate();
+  for (let id in players) {
+    if (!data[id]) {
+      scene.remove(players[id]);
+      delete players[id];
+    }
+  }
+});
 
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-  </script>
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key]=true);
+window.addEventListener("keyup", e => keys[e.key]=false);
+
+// Checkered floor
+const floorSize = 200;
+const tiles = 20;
+const floorCanvas = document.createElement("canvas");
+floorCanvas.width = floorCanvas.height = 512;
+const ctx = floorCanvas.getContext("2d");
+for (let y=0;y<8;y++){
+  for(let x=0;x<8;x++){
+    ctx.fillStyle = (x+y)%2===0 ? "#ffffff" : "#999999";
+    ctx.fillRect(x*64,y*64,64,64);
+  }
+}
+const floorTexture = new THREE.CanvasTexture(floorCanvas);
+floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+floorTexture.repeat.set(tiles, tiles);
+const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture, side: THREE.DoubleSide });
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMaterial);
+floorMesh.rotation.x = -Math.PI/2;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff,0.6);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffffff,1);
+sunLight.position.set(50,100,50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width=2048;
+sunLight.shadow.mapSize.height=2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 500;
+scene.add(sunLight);
+
+function animate() {
+  requestAnimationFrame(animate);
+  let moved=false;
+  if (keys["w"]){player.position.z-=0.05;moved=true;}
+  if (keys["s"]){player.position.z+=0.05;moved=true;}
+  if (keys["a"]){player.position.x-=0.05;moved=true;}
+  if (keys["d"]){player.position.x+=0.05;moved=true;}
+  if (moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
+  updateCamera();
+  renderer.render(scene,camera);
+}
+animate();
+
+window.addEventListener("resize",()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
 </body>
 </html>
-
