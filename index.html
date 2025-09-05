@@ -2,132 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Beveled Character with Firebase</title>
+  <title>Three.js Firebase Character</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     canvas { display: block; }
   </style>
 </head>
 <body>
-<script src="https://unpkg.com/three/build/three.min.js"></script>
-<script src="https://unpkg.com/three/examples/js/geometries/RoundedBoxGeometry.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script type="module">
+  // Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-  authDomain: "pasja-data5100s.firebaseapp.com",
-  projectId: "pasja-data5100s",
-  storageBucket: "pasja-data5100s.firebasestorage.app",
-  messagingSenderId: "1042573635103",
-  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-  measurementId: "G-Z2GYGXQTMZ"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  const firebaseConfig = {
+    apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+    authDomain: "pasja-data5100s.firebaseapp.com",
+    projectId: "pasja-data5100s",
+    storageBucket: "pasja-data5100s.firebasestorage.app",
+    messagingSenderId: "1042573635103",
+    appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+    measurementId: "G-Z2GYGXQTMZ"
+  };
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+  const appFB = initializeApp(firebaseConfig);
+  const db = getDatabase(appFB);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(5, 10, 7);
-scene.add(dirLight);
+  // Three.js Scene
+  const scene = new THREE.Scene();
 
-const texLoader = new THREE.TextureLoader();
-const floorTex = texLoader.load('https://threejsfundamentals.org/threejs/resources/images/checker.png');
-floorTex.wrapS = THREE.RepeatWrapping;
-floorTex.wrapT = THREE.RepeatWrapping;
-floorTex.repeat.set(20, 20);
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(100, 100),
-  new THREE.MeshStandardMaterial({ map: floorTex, side: THREE.DoubleSide })
-);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 5, 10);
 
-const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
-const character = new THREE.Group();
-
-const head = new THREE.Mesh(new THREE.RoundedBoxGeometry(1.25, 1.25, 1.25, 4, 0.2), mat);
-head.position.y = 3.2;
-character.add(head);
-
-const torso = new THREE.Mesh(new THREE.RoundedBoxGeometry(2, 2.5, 1, 4, 0.2), mat);
-torso.position.y = 1.5;
-character.add(torso);
-
-const leftArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.7, 2, 0.7, 4, 0.15), mat);
-leftArm.position.set(-1.6, 1.5, 0);
-character.add(leftArm);
-
-const rightArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.7, 2, 0.7, 4, 0.15), mat);
-rightArm.position.set(1.6, 1.5, 0);
-character.add(rightArm);
-
-const leftLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.8, 2, 0.8, 4, 0.15), mat);
-leftLeg.position.set(-0.6, -0.5, 0);
-character.add(leftLeg);
-
-const rightLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.8, 2, 0.8, 4, 0.15), mat);
-rightLeg.position.set(0.6, -0.5, 0);
-character.add(rightLeg);
-
-scene.add(character);
-
-const keys = {};
-document.addEventListener('keydown', e => keys[e.code] = true);
-document.addEventListener('keyup', e => keys[e.code] = false);
-
-function moveCharacter() {
-  const speed = 0.1;
-  if (keys['KeyW']) character.position.z -= speed;
-  if (keys['KeyS']) character.position.z += speed;
-  if (keys['KeyA']) character.position.x -= speed;
-  if (keys['KeyD']) character.position.x += speed;
-  db.ref('character/position').set({
-    x: character.position.x,
-    y: character.position.y,
-    z: character.position.z
-  });
-}
-
-db.ref('character/position').on('value', snap => {
-  const pos = snap.val();
-  if (pos) character.position.set(pos.x, pos.y, pos.z);
-});
-
-camera.position.set(0, 5, 10);
-
-function updateCamera() {
-  const desiredPos = new THREE.Vector3(
-    character.position.x,
-    character.position.y + 5,
-    character.position.z + 10
-  );
-  camera.position.lerp(desiredPos, 0.1);
-  camera.lookAt(character.position.clone().add(new THREE.Vector3(0, 2, 0)));
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  moveCharacter();
-  updateCamera();
-  renderer.render(scene, camera);
-}
-animate();
-
-window.addEventListener('contextmenu', e => e.preventDefault());
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  document.body.appendChild(renderer.domElement);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  dirLight.position.set(5, 10, 7);
+  scene.add(dirLight);
+
+  // Checkered floor
+  const size = 100, divisions = 100;
+  const gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
+  scene.add(gridHelper);
+
+  // Character
+  const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+  const character = new THREE.Group();
+
+  const head = new THREE.Mesh(new THREE.RoundedBoxGeometry(1.25, 1.25, 1.25, 4, 0.15), mat);
+  head.position.y = 3.25;
+  character.add(head);
+
+  const torso = new THREE.Mesh(new THREE.RoundedBoxGeometry(2, 2, 1, 4, 0.15), mat);
+  torso.position.y = 1.5;
+  character.add(torso);
+
+  const leftArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1, 2, 1, 4, 0.15), mat);
+  leftArm.position.set(-1.5, 1.5, 0);
+  character.add(leftArm);
+
+  const rightArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1, 2, 1, 4, 0.15), mat);
+  rightArm.position.set(1.5, 1.5, 0);
+  character.add(rightArm);
+
+  const leftLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1, 2, 1, 4, 0.15), mat);
+  leftLeg.position.set(-0.5, -0.5, 0);
+  character.add(leftLeg);
+
+  const rightLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1, 2, 1, 4, 0.15), mat);
+  rightLeg.position.set(0.5, -0.5, 0);
+  character.add(rightLeg);
+
+  scene.add(character);
+
+  // Controls
+  const keys = {};
+  window.addEventListener("keydown", (e) => keys[e.key] = true);
+  window.addEventListener("keyup", (e) => keys[e.key] = false);
+
+  // Animation loop
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const speed = 0.1;
+    if (keys["w"]) character.position.z -= speed;
+    if (keys["s"]) character.position.z += speed;
+    if (keys["a"]) character.position.x -= speed;
+    if (keys["d"]) character.position.x += speed;
+
+    // Camera follow
+    camera.position.lerp(new THREE.Vector3(
+      character.position.x, character.position.y + 5, character.position.z + 10
+    ), 0.1);
+    camera.lookAt(character.position);
+
+    // Save position to Firebase
+    set(ref(db, "player1"), {
+      x: character.position.x,
+      y: character.position.y,
+      z: character.position.z
+    });
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 </script>
 </body>
 </html>
+
