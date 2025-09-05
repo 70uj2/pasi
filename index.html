@@ -2,33 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>pasja</title>
+<title>Three.js Firebase Multiplayer</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" href="data:,">
 <style>
-  html,body { height:100%; margin:0; background:#111; color:#ddd; font-family: Inter, system-ui, sans-serif; }
+  html,body { height:100%; margin:0; background:#111; overflow:hidden; }
   #canvas { display:block; width:100%; height:100vh; }
   .ui {
     position: absolute; right: 12px; top: 12px;
     background: rgba(0,0,0,0.35); padding:10px; border-radius:8px;
     backdrop-filter: blur(4px);
-    display:flex; gap:8px; align-items:center;
   }
-  .ui label { font-size:13px; color:#eee; margin-right:6px; }
-  #idBadge { position: absolute; left:12px; top:12px; background: rgba(255,255,255,0.06); padding:8px 10px; color:#eee; border-radius:8px; font-size:12px; }
-  #help { position: absolute; left:12px; bottom:12px; background: rgba(255,255,255,0.03); padding:8px 10px; color:#bbb; border-radius:8px; font-size:12px; }
 </style>
 </head>
 <body>
 <canvas id="canvas"></canvas>
 
-
-
 <div class="ui">
-  <label for="color">Color</label>
   <input id="color" type="color" value="#888888" />
-  <button id="centerCam">Center Cam</button>
 </div>
-
 
 <script type="module">
 /* ----------------------------
@@ -36,20 +28,18 @@
   Realtime DB via Firebase (v9 modular)
   ---------------------------- */
 
-// import three.js and orbit controls from CDNs
+// import three.js and orbit controls from CDN
 import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
 
 // import firebase modular SDK (Realtime Database)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
 import {
-  getDatabase, ref, set, onValue, onDisconnect, remove, update, serverTimestamp, onChildAdded, onChildRemoved, onChildChanged
+  getDatabase, ref, set, onDisconnect, remove, update,
+  onChildAdded, onChildRemoved, onChildChanged
 } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js';
 
-/* ========  EDIT THIS: YOUR FIREBASE CONFIG  ========
-   Replace the placeholders below with your Firebase project's config.
-   You can find this in the Firebase console -> Project settings -> SDK setup.
-*/
+/* ========  YOUR FIREBASE CONFIG  ======== */
 const firebaseConfig = {
   apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
   authDomain: "pasja-data5100s.firebaseapp.com",
@@ -60,27 +50,13 @@ const firebaseConfig = {
   appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
   measurementId: "G-Z2GYGXQTMZ"
 };
-// ====================================================
+/* ========================================= */
 
-if (!firebaseConfig || firebaseConfig.apiKey === "REPLACE_ME") {
-  alert("Please paste your Firebase config into the file (firebaseConfig) before running.");
-  throw new Error("Firebase config not set.");
-}
-
-// init firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 /////////// simple player id
-const myId = (() => {
-  // random 6-char alphanumeric
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let s = '';
-  for (let i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
-  return s;
-})();
-
-document.getElementById('myId').textContent = myId;
+const myId = Math.random().toString(36).substring(2,8);
 
 /* -------- Three.js scene setup -------- */
 const canvas = document.getElementById('canvas');
@@ -99,22 +75,18 @@ controls.target.set(0,1,0);
 controls.update();
 
 /* lighting */
-const hemi = new THREE.HemisphereLight(0xffffff, 0x222224, 0.9);
-scene.add(hemi);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x222224, 0.9));
 const dir = new THREE.DirectionalLight(0xffffff, 0.7);
 dir.position.set(5,10,7);
 scene.add(dir);
 
 /* ground */
-const groundMat = new THREE.MeshStandardMaterial({color:0x222222, roughness:1});
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(200,200), groundMat);
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(200,200),
+  new THREE.MeshStandardMaterial({color:0x222222})
+);
 ground.rotation.x = -Math.PI/2;
-ground.position.y = 0;
 scene.add(ground);
-
-/* sample box to show scale */
-const grid = new THREE.GridHelper(50,50,0x333333,0x222222);
-scene.add(grid);
 
 /* my player (a cube) */
 const playerHeight = 1.6;
@@ -126,16 +98,8 @@ const myMesh = new THREE.Mesh(cubeGeo, myMat);
 myMesh.position.set(0, playerHeight/2, 0);
 scene.add(myMesh);
 
-/* other players map: id -> {mesh, lastReceived, target, color} */
+/* other players map */
 const others = new Map();
-
-/* camera follow target */
-function centerCameraOnPlayer(){
-  controls.target.copy(myMesh.position);
-  camera.position.set(myMesh.position.x + 8, myMesh.position.y + 6, myMesh.position.z + 8);
-  controls.update();
-}
-document.getElementById('centerCam').onclick = centerCameraOnPlayer;
 
 /* resize */
 window.addEventListener('resize', ()=>{
@@ -145,189 +109,84 @@ window.addEventListener('resize', ()=>{
 });
 
 /* simple movement */
-const keys = { w:false,a:false,s:false,d:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false };
-window.addEventListener('keydown', e => {
-  if (e.key in keys) { keys[e.key] = true; e.preventDefault(); }
-});
-window.addEventListener('keyup', e => {
-  if (e.key in keys) { keys[e.key] = false; e.preventDefault(); }
-});
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
 
 function movementVector(dt){
-  const speed = 5; // units / sec
+  const speed = 5;
   let x=0,z=0;
   if (keys.w || keys.ArrowUp) z -= 1;
   if (keys.s || keys.ArrowDown) z += 1;
   if (keys.a || keys.ArrowLeft) x -= 1;
   if (keys.d || keys.ArrowRight) x += 1;
   const len = Math.hypot(x,z);
-  if (len > 0){
-    x = (x/len) * speed * dt;
-    z = (z/len) * speed * dt;
-  }
+  if (len > 0){ x = (x/len) * speed * dt; z = (z/len) * speed * dt; }
   return {x,z};
 }
 
-/* --------- Firebase: player presence and updates --------- */
-const playersRef = ref(db, 'players');
-
-/* write our presence (initial) and setup onDisconnect to remove it */
+/* Firebase presence */
 const myRef = ref(db, `players/${myId}`);
-const initialData = {
-  x: myMesh.position.x,
-  y: myMesh.position.y,
-  z: myMesh.position.z,
-  color: myColor,
-  updated: Date.now()
-};
-set(myRef, initialData).catch(err => console.error('set error', err));
-onDisconnect(myRef).remove().catch(e => console.warn('onDisconnect not supported in this environment?', e));
+set(myRef, {x:0, y:playerHeight/2, z:0, color:myColor});
+onDisconnect(myRef).remove();
 
-/* Listen for child added/changed/removed to keep others in sync */
-onChildAdded(playersRef, (snap) => {
-  const id = snap.key;
-  if (!id || id === myId) return;
-  const val = snap.val();
-  addOrUpdateRemote(id, val);
-});
-onChildChanged(playersRef, (snap) => {
-  const id = snap.key;
-  if (!id || id === myId) return;
-  const val = snap.val();
-  addOrUpdateRemote(id, val);
-});
-onChildRemoved(playersRef, (snap) => {
-  const id = snap.key;
-  if (!id) return;
-  removeRemote(id);
-});
-
-/* helper to add/update other players */
-function addOrUpdateRemote(id, val){
-  if (!val) return;
-  let entry = others.get(id);
-  if (!entry){
-    const mat = new THREE.MeshStandardMaterial({color: val.color || '#999999'});
-    const mesh = new THREE.Mesh(cubeGeo, mat);
-    scene.add(mesh);
-    entry = {
-      mesh,
-      color: val.color || '#999999',
-      target: new THREE.Vector3(val.x||0, (playerHeight/2), val.z||0),
-      lastReceived: Date.now()
-    };
-    mesh.position.copy(entry.target);
-    others.set(id, entry);
-  } else {
-    // update color
-    if (val.color && val.color !== entry.color){
-      entry.color = val.color;
-      entry.mesh.material.color.set(val.color);
-    }
-    // update target pos and timestamp
-    entry.target.set(val.x || 0, playerHeight/2, val.z || 0);
-    entry.lastReceived = Date.now();
-  }
-}
-
-/* remove remote player */
-function removeRemote(id){
-  const entry = others.get(id);
-  if (entry){
-    scene.remove(entry.mesh);
-    if (entry.mesh.geometry) entry.mesh.geometry.dispose();
-    if (entry.mesh.material) entry.mesh.material.dispose();
-    others.delete(id);
-  }
-}
-
-/* update our color when user picks a new one */
+/* update my color */
 myColorInput.addEventListener('input', (e) => {
   myColor = e.target.value;
   myMesh.material.color.set(myColor);
-  // push color to firebase
-  update(myRef, { color: myColor, updated: Date.now() }).catch(err=>console.warn(err));
+  update(myRef, { color: myColor });
 });
 
-/* throttled update to database */
-let lastSent = 0;
-const SEND_INTERVAL = 100; // ms
-function maybeSendState(force=false){
-  const now = Date.now();
-  if (force || now - lastSent >= SEND_INTERVAL){
-    lastSent = now;
-    update(myRef, {
-      x: myMesh.position.x,
-      y: myMesh.position.y,
-      z: myMesh.position.z,
-      color: myColor,
-      updated: now
-    }).catch(err => console.warn('update error', err));
+/* listen for other players */
+function addOrUpdateRemote(id, val){
+  if (id===myId) return;
+  let entry = others.get(id);
+  if (!entry){
+    const mat = new THREE.MeshStandardMaterial({color: val.color || '#999'});
+    const mesh = new THREE.Mesh(cubeGeo, mat);
+    scene.add(mesh);
+    entry = { mesh, target: new THREE.Vector3(val.x||0, playerHeight/2, val.z||0) };
+    mesh.position.copy(entry.target);
+    others.set(id, entry);
+  } else {
+    if (val.color) entry.mesh.material.color.set(val.color);
+    entry.target.set(val.x||0, playerHeight/2, val.z||0);
   }
 }
 
-/* also remove our node when window unloads (best-effort) */
-window.addEventListener('beforeunload', () => {
-  remove(myRef).catch(()=>{});
+onChildAdded(ref(db,'players'), snap => addOrUpdateRemote(snap.key, snap.val()));
+onChildChanged(ref(db,'players'), snap => addOrUpdateRemote(snap.key, snap.val()));
+onChildRemoved(ref(db,'players'), snap => {
+  const entry = others.get(snap.key);
+  if (entry){ scene.remove(entry.mesh); others.delete(snap.key); }
 });
 
-/* interpolate others for smooth motion */
-function updateOthers(dt){
-  others.forEach((entry, id) => {
-    // simple linear interpolation towards target
-    const current = entry.mesh.position;
-    const target = entry.target;
-    const lerpSpeed = 10.0; // larger -> faster catch up
-    current.lerp(target, Math.min(1, lerpSpeed * dt));
-  });
-}
-
-/* main render loop */
+/* main loop */
 let lastT = performance.now();
+let lastSent = 0;
 function animate(t){
-  const dt = Math.min(0.1, (t - lastT) / 1000);
-  lastT = t;
-
-  // movement
+  const dt = Math.min(0.1, (t - lastT)/1000); lastT = t;
   const mv = movementVector(dt);
-  myMesh.position.x += mv.x;
-  myMesh.position.z += mv.z;
+  myMesh.position.x += mv.x; myMesh.position.z += mv.z;
+  if (Math.abs(mv.x)+Math.abs(mv.z) > 0.001) myMesh.rotation.y = Math.atan2(mv.x, mv.z);
 
-  // rotate to face move direction when moving
-  if (Math.abs(mv.x) > 1e-4 || Math.abs(mv.z) > 1e-4){
-    const angle = Math.atan2(mv.x, mv.z);
-    myMesh.rotation.y = angle;
+  // send updates
+  if (t - lastSent > 100){
+    lastSent = t;
+    update(myRef, { x: myMesh.position.x, y: myMesh.position.y, z: myMesh.position.z, color: myColor });
   }
 
-  // send update occasionally
-  maybeSendState();
+  // smooth others
+  others.forEach(entry=>{
+    entry.mesh.position.lerp(entry.target, 0.1);
+  });
 
-  // smooth remote players
-  updateOthers(dt);
-
-  // simple cam follow (soft)
-  const desired = new THREE.Vector3(myMesh.position.x + 8, myMesh.position.y + 6, myMesh.position.z + 8);
-  camera.position.lerp(desired, 0.06);
-  controls.target.lerp(myMesh.position, 0.06);
+  controls.target.lerp(myMesh.position,0.06);
   controls.update();
-
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
-
-/* ensure there's a node removal if we disconnect unexpectedly (some envs won't honor onDisconnect) */
-setInterval(() => {
-  maybeSendState();
-}, 1000);
-
-/* Debug: show existing players once initially */
-onValue(playersRef, (snap) => {
-  // this listener will also fire with the full set; but we already have child handlers.
-}, {onlyOnce:true});
-
-/* Small helper: center view on connect */
-centerCameraOnPlayer();
 
 </script>
 </body>
