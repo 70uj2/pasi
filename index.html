@@ -11,11 +11,13 @@
 <body>
 <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
-<script type="module">
-  // Firebase
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
+<!-- Firebase SDKs (compat mode, no modules) -->
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database-compat.js"></script>
+
+<script>
+  // Firebase Config
   const firebaseConfig = {
     apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
     authDomain: "pasja-data5100s.firebaseapp.com",
@@ -26,10 +28,11 @@
     measurementId: "G-Z2GYGXQTMZ"
   };
 
-  const appFB = initializeApp(firebaseConfig);
-  const db = getDatabase(appFB);
+  // Init Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-  // Three.js Scene
+  // Three.js Setup
   const scene = new THREE.Scene();
 
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -45,12 +48,11 @@
   dirLight.position.set(5, 10, 7);
   scene.add(dirLight);
 
-  // Checkered floor
-  const size = 100, divisions = 100;
-  const gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
+  // Floor Grid
+  const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
   scene.add(gridHelper);
 
-  // Character
+  // Character (Rounded Boxes)
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const character = new THREE.Group();
 
@@ -102,7 +104,7 @@
     camera.lookAt(character.position);
 
     // Save position to Firebase
-    set(ref(db, "player1"), {
+    db.ref("player1").set({
       x: character.position.x,
       y: character.position.y,
       z: character.position.z
@@ -120,4 +122,3 @@
 </script>
 </body>
 </html>
-
