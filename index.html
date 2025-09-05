@@ -2,171 +2,132 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Cube Game</title>
+  <title>Beveled Character with Firebase</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
-    #colorPicker { position: absolute; top: 10px; right: 10px; z-index: 10; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <input type="color" id="colorPicker" value="#808080">
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three/build/three.min.js"></script>
+<script src="https://unpkg.com/three/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-      authDomain: "pasja-data5100s.firebaseapp.com",
-      projectId: "pasja-data5100s",
-      storageBucket: "pasja-data5100s.firebasestorage.app",
-      messagingSenderId: "1042573635103",
-      appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-      measurementId: "G-Z2GYGXQTMZ"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+  authDomain: "pasja-data5100s.firebaseapp.com",
+  projectId: "pasja-data5100s",
+  storageBucket: "pasja-data5100s.firebasestorage.app",
+  messagingSenderId: "1042573635103",
+  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+  measurementId: "G-Z2GYGXQTMZ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(10, 20, 10);
-    scene.add(dirLight);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 7);
+scene.add(dirLight);
 
-    const size = 200, divisions = 40;
-    const gridHelper = new THREE.GridHelper(size, divisions, 0x444444, 0x222222);
-    scene.add(gridHelper);
+const texLoader = new THREE.TextureLoader();
+const floorTex = texLoader.load('https://threejsfundamentals.org/threejs/resources/images/checker.png');
+floorTex.wrapS = THREE.RepeatWrapping;
+floorTex.wrapT = THREE.RepeatWrapping;
+floorTex.repeat.set(20, 20);
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 100),
+  new THREE.MeshStandardMaterial({ map: floorTex, side: THREE.DoubleSide })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
 
-    function createChamferedBox(w, h, d, bevel = 0.1, color = 0x808080) {
-      const shape = new THREE.Shape();
-      const bw = w / 2 - bevel, bh = h / 2 - bevel;
-      shape.moveTo(-bw, -bh);
-      shape.lineTo(bw, -bh);
-      shape.lineTo(bw, bh);
-      shape.lineTo(-bw, bh);
-      shape.lineTo(-bw, -bh);
+const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const character = new THREE.Group();
 
-      const extrudeSettings = {
-        steps: 1,
-        depth: d - 2 * bevel,
-        bevelEnabled: true,
-        bevelThickness: bevel,
-        bevelSize: bevel,
-        bevelSegments: 2
-      };
+const head = new THREE.Mesh(new THREE.RoundedBoxGeometry(1.25, 1.25, 1.25, 4, 0.2), mat);
+head.position.y = 3.2;
+character.add(head);
 
-      const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      const material = new THREE.MeshStandardMaterial({ color });
-      return new THREE.Mesh(geometry, material);
-    }
+const torso = new THREE.Mesh(new THREE.RoundedBoxGeometry(2, 2.5, 1, 4, 0.2), mat);
+torso.position.y = 1.5;
+character.add(torso);
 
-    function createCharacter(color) {
-      const group = new THREE.Group();
-      const torso = createChamferedBox(2, 3, 1, 0.2, color);
-      torso.position.y = 1.5;
-      group.add(torso);
+const leftArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.7, 2, 0.7, 4, 0.15), mat);
+leftArm.position.set(-1.6, 1.5, 0);
+character.add(leftArm);
 
-      const head = createChamferedBox(1.5, 1.5, 1.5, 0.15, color);
-      head.position.y = 4;
-      group.add(head);
+const rightArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.7, 2, 0.7, 4, 0.15), mat);
+rightArm.position.set(1.6, 1.5, 0);
+character.add(rightArm);
 
-      const armL = createChamferedBox(0.75, 2.5, 0.75, 0.1, color);
-      armL.position.set(-1.5, 2.5, 0);
-      group.add(armL);
+const leftLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.8, 2, 0.8, 4, 0.15), mat);
+leftLeg.position.set(-0.6, -0.5, 0);
+character.add(leftLeg);
 
-      const armR = createChamferedBox(0.75, 2.5, 0.75, 0.1, color);
-      armR.position.set(1.5, 2.5, 0);
-      group.add(armR);
+const rightLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(0.8, 2, 0.8, 4, 0.15), mat);
+rightLeg.position.set(0.6, -0.5, 0);
+character.add(rightLeg);
 
-      const legL = createChamferedBox(0.9, 3, 0.9, 0.1, color);
-      legL.position.set(-0.6, -1.5, 0);
-      group.add(legL);
+scene.add(character);
 
-      const legR = createChamferedBox(0.9, 3, 0.9, 0.1, color);
-      legR.position.set(0.6, -1.5, 0);
-      group.add(legR);
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
 
-      return group;
-    }
+function moveCharacter() {
+  const speed = 0.1;
+  if (keys['KeyW']) character.position.z -= speed;
+  if (keys['KeyS']) character.position.z += speed;
+  if (keys['KeyA']) character.position.x -= speed;
+  if (keys['KeyD']) character.position.x += speed;
+  db.ref('character/position').set({
+    x: character.position.x,
+    y: character.position.y,
+    z: character.position.z
+  });
+}
 
-    let playerColor = document.getElementById('colorPicker').value;
-    let player = createCharacter(playerColor);
-    scene.add(player);
+db.ref('character/position').on('value', snap => {
+  const pos = snap.val();
+  if (pos) character.position.set(pos.x, pos.y, pos.z);
+});
 
-    const playerId = Math.random().toString(36).substr(2, 9);
-    const playersRef = db.ref('players');
+camera.position.set(0, 5, 10);
 
-    document.getElementById('colorPicker').addEventListener('input', e => {
-      playerColor = e.target.value;
-      scene.remove(player);
-      player = createCharacter(playerColor);
-      player.position.copy(player.position);
-      scene.add(player);
-    });
+function updateCamera() {
+  const desiredPos = new THREE.Vector3(
+    character.position.x,
+    character.position.y + 5,
+    character.position.z + 10
+  );
+  camera.position.lerp(desiredPos, 0.1);
+  camera.lookAt(character.position.clone().add(new THREE.Vector3(0, 2, 0)));
+}
 
-    const otherPlayers = {};
-    playersRef.on('value', snapshot => {
-      const data = snapshot.val();
-      for (let id in data) {
-        if (id !== playerId) {
-          if (!otherPlayers[id]) {
-            const newChar = createCharacter(data[id].color);
-            scene.add(newChar);
-            otherPlayers[id] = newChar;
-          }
-          otherPlayers[id].position.set(data[id].x, data[id].y, data[id].z);
-        }
-      }
-    });
+function animate() {
+  requestAnimationFrame(animate);
+  moveCharacter();
+  updateCamera();
+  renderer.render(scene, camera);
+}
+animate();
 
-    const keys = {};
-    document.addEventListener('keydown', e => keys[e.key] = true);
-    document.addEventListener('keyup', e => keys[e.key] = false);
-
-    let camDistance = 10, camAngleX = 0, camAngleY = 0.5;
-    document.addEventListener('mousemove', e => {
-      if (e.buttons === 1) {
-        camAngleX -= e.movementX * 0.005;
-        camAngleY -= e.movementY * 0.005;
-        camAngleY = Math.max(0.1, Math.min(Math.PI / 2, camAngleY));
-      }
-    });
-
-    function updateCamera() {
-      const target = player.position;
-      const x = target.x + camDistance * Math.sin(camAngleX) * Math.cos(camAngleY);
-      const y = target.y + camDistance * Math.sin(camAngleY);
-      const z = target.z + camDistance * Math.cos(camAngleX) * Math.cos(camAngleY);
-      camera.position.set(x, y, z);
-      camera.lookAt(target);
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      if (keys['w']) player.position.z -= 0.1;
-      if (keys['s']) player.position.z += 0.1;
-      if (keys['a']) player.position.x -= 0.1;
-      if (keys['d']) player.position.x += 0.1;
-
-      playersRef.child(playerId).set({
-        x: player.position.x,
-        y: player.position.y,
-        z: player.position.z,
-        color: playerColor
-      });
-
-      updateCamera();
-      renderer.render(scene, camera);
-    }
-
-    animate();
-    camera.position.z = 10;
-  </script>
+window.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 </body>
 </html>
