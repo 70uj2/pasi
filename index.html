@@ -12,9 +12,7 @@
     }
   </style>
 </head>
-<body oncontextmenu="return false;">
-  <script>window.addEventListener("contextmenu", e => e.preventDefault());
-  </script>
+<body>
   <input type="color" id="colorPicker" value="#888888" />
 
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
@@ -22,6 +20,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
+  window.addEventListener("contextmenu", e => e.preventDefault());
+
   const firebaseConfig = {
     apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
     authDomain: "pasja-data5100s.firebaseapp.com",
@@ -36,17 +36,14 @@
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer();
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
-
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(5, 10, 7);
-  scene.add(light);
 
   const geometry = new THREE.BoxGeometry();
   const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const player = new THREE.Mesh(geometry, material);
+  player.castShadow = true;
   scene.add(player);
 
   const players = {};
@@ -54,7 +51,7 @@
 
   let radius = 5;
   let theta = 0;
-  let phi = Math.PI / 4;
+  let phi = Math.PI/4;
   let isDragging = false;
   let lastX, lastY;
 
@@ -67,11 +64,7 @@
   }
   updateCamera();
 
-  window.addEventListener("mousedown", e => {
-    isDragging = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-  });
+  window.addEventListener("mousedown", e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
   window.addEventListener("mouseup", () => isDragging = false);
   window.addEventListener("mousemove", e => {
     if (!isDragging) return;
@@ -85,7 +78,7 @@
     lastY = e.clientY;
   });
   window.addEventListener("wheel", e => {
-    radius += e.deltaY * 0.01;
+    radius += e.deltaY*0.01;
     radius = Math.max(2, Math.min(20, radius));
     updateCamera();
   });
@@ -96,15 +89,16 @@
 
   document.getElementById("colorPicker").addEventListener("input", e => {
     player.material.color.set(e.target.value);
-    playerRef.update({ color: e.target.value });
+    playerRef.update({ color:e.target.value });
   });
 
   db.ref("players").on("value", snapshot => {
     const data = snapshot.val() || {};
     for (let id in data) {
-      if (id === playerId) continue;
+      if (id===playerId) continue;
       if (!players[id]) {
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: data[id].color }));
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color:data[id].color }));
+        mesh.castShadow = true;
         scene.add(mesh);
         players[id] = mesh;
       }
@@ -120,29 +114,45 @@
   });
 
   const keys = {};
-  window.addEventListener("keydown", e => keys[e.key] = true);
-  window.addEventListener("keyup", e => keys[e.key] = false);
+  window.addEventListener("keydown", e => keys[e.key]=true);
+  window.addEventListener("keyup", e => keys[e.key]=false);
+
+  const floorSize = 200;
+  const divisions = 40;
+  const gridHelper = new THREE.GridHelper(floorSize, divisions, 0x444444, 0x888888);
+  scene.add(gridHelper);
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambientLight);
+
+  const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+  sunLight.position.set(50,100,50);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 500;
+  scene.add(sunLight);
 
   function animate() {
     requestAnimationFrame(animate);
     let moved = false;
-    if (keys["w"]) { player.position.z -= 0.05; moved = true; }
-    if (keys["s"]) { player.position.z += 0.05; moved = true; }
-    if (keys["a"]) { player.position.x -= 0.05; moved = true; }
-    if (keys["d"]) { player.position.x += 0.05; moved = true; }
-    if (moved) {
-      playerRef.update({ x: player.position.x, y: player.position.y, z: player.position.z });
-    }
+    if (keys["w"]) { player.position.z -= 0.05; moved=true; }
+    if (keys["s"]) { player.position.z += 0.05; moved=true; }
+    if (keys["a"]) { player.position.x -= 0.05; moved=true; }
+    if (keys["d"]) { player.position.x += 0.05; moved=true; }
+    if (moved) playerRef.update({ x:player.position.x, y:player.position.y, z:player.position.z });
     updateCamera();
     renderer.render(scene, camera);
   }
   animate();
 
   window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
   </script>
 </body>
 </html>
+
