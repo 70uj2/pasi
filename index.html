@@ -41,10 +41,45 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-const geometry = new THREE.BoxGeometry();
-const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
-const player = new THREE.Mesh(geometry, material);
-player.castShadow = true;
+// Character model instead of cube
+function createCharacter(color) {
+  const mat = new THREE.MeshStandardMaterial({ color });
+  const group = new THREE.Group();
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
+  head.position.y = 3.25;
+  head.castShadow = true;
+  group.add(head);
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
+  torso.position.y = 1.5;
+  torso.castShadow = true;
+  group.add(torso);
+
+  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  leftArm.position.set(-1.5, 1.5, 0);
+  leftArm.castShadow = true;
+  group.add(leftArm);
+
+  const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  rightArm.position.set(1.5, 1.5, 0);
+  rightArm.castShadow = true;
+  group.add(rightArm);
+
+  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  leftLeg.position.set(-0.5, -0.5, 0);
+  leftLeg.castShadow = true;
+  group.add(leftLeg);
+
+  const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  rightLeg.position.set(0.5, -0.5, 0);
+  rightLeg.castShadow = true;
+  group.add(rightLeg);
+
+  return group;
+}
+
+const player = createCharacter(0x888888);
 scene.add(player);
 
 const players = {};
@@ -89,7 +124,9 @@ playerRef.set({ x:0, y:0, z:0, color:"#888888" });
 playerRef.onDisconnect().remove();
 
 document.getElementById("colorPicker").addEventListener("input", e => {
-  player.material.color.set(e.target.value);
+  player.traverse(obj => {
+    if (obj.isMesh) obj.material.color.set(e.target.value);
+  });
   playerRef.update({ color:e.target.value });
 });
 
@@ -98,12 +135,14 @@ db.ref("players").on("value", snapshot => {
   for (let id in data) {
     if (id===playerId) continue;
     if (!players[id]) {
-      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color:data[id].color }));
+      const mesh = createCharacter(data[id].color);
       mesh.castShadow = true;
       scene.add(mesh);
       players[id] = mesh;
     }
-    players[id].material.color.set(data[id].color);
+    players[id].traverse(obj => {
+      if (obj.isMesh) obj.material.color.set(data[id].color);
+    });
     players[id].position.set(data[id].x, data[id].y, data[id].z);
   }
   for (let id in players) {
