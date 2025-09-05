@@ -10,17 +10,19 @@
 </head>
 <body>
 
-<!-- Three.js first -->
+<!-- Three.js must load FIRST -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
 
-<!-- Firebase (compat version, no import/export) -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database-compat.js"></script>
 
-<!-- Your code goes last -->
+<!-- Your custom game code comes LAST -->
 <script>
-  // Firebase Config
+  console.log("THREE before use:", THREE); // <-- Debug line, should NOT be undefined
+
+  // Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
     authDomain: "pasja-data5100s.firebaseapp.com",
@@ -30,14 +32,11 @@
     appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
     measurementId: "G-Z2GYGXQTMZ"
   };
-
-  // Init Firebase
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // Three.js Setup
+  // Three.js setup
   const scene = new THREE.Scene();
-
   const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
   camera.position.set(0, 5, 10);
 
@@ -51,11 +50,7 @@
   dirLight.position.set(5, 10, 7);
   scene.add(dirLight);
 
-  // Floor Grid
-  const gridHelper = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
-  scene.add(gridHelper);
-
-  // Character (Rounded Boxes)
+  // Character model
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const character = new THREE.Group();
 
@@ -85,12 +80,11 @@
 
   scene.add(character);
 
-  // Controls
+  // Movement controls
   const keys = {};
-  window.addEventListener("keydown", (e) => keys[e.key] = true);
-  window.addEventListener("keyup", (e) => keys[e.key] = false);
+  window.addEventListener("keydown", e => keys[e.key] = true);
+  window.addEventListener("keyup", e => keys[e.key] = false);
 
-  // Animation loop
   function animate() {
     requestAnimationFrame(animate);
 
@@ -100,13 +94,11 @@
     if (keys["a"]) character.position.x -= speed;
     if (keys["d"]) character.position.x += speed;
 
-    // Camera follow
     camera.position.lerp(new THREE.Vector3(
       character.position.x, character.position.y + 5, character.position.z + 10
     ), 0.1);
     camera.lookAt(character.position);
 
-    // Save position to Firebase
     db.ref("player1").set({
       x: character.position.x,
       y: character.position.y,
@@ -116,12 +108,7 @@
     renderer.render(scene, camera);
   }
   animate();
-
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
 </script>
+
 </body>
 </html>
