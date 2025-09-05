@@ -16,12 +16,15 @@
 <body>
   <input type="color" id="colorPicker" value="#808080">
 
-  <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  <!-- Three.js and extras -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script>
     // --- Firebase setup ---
     const firebaseConfig = {
       apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
@@ -34,8 +37,8 @@
       measurementId: "G-Z2GYGXQTMZ"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     // --- Three.js setup ---
     const scene = new THREE.Scene();
@@ -44,7 +47,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
     camera.position.set(0, 2, 5);
     controls.update();
 
@@ -63,7 +66,7 @@
     let playerColor = "#808080";
     let keys = {};
 
-    // Movement controls
+    // Movement
     window.addEventListener("keydown", e => keys[e.key] = true);
     window.addEventListener("keyup", e => keys[e.key] = false);
 
@@ -76,9 +79,8 @@
     // Other players
     const players = {};
 
-    // Sync player data to Firebase
     function updatePlayer() {
-      set(ref(db, "players/" + playerId), {
+      db.ref("players/" + playerId).set({
         x: playerCube.position.x,
         y: playerCube.position.y,
         z: playerCube.position.z,
@@ -87,10 +89,10 @@
     }
 
     // Remove player when disconnected
-    onDisconnect(ref(db, "players/" + playerId)).remove();
+    db.ref("players/" + playerId).onDisconnect().remove();
 
     // Listen for other players
-    onValue(ref(db, "players"), snapshot => {
+    db.ref("players").on("value", snapshot => {
       const data = snapshot.val() || {};
       for (const id in data) {
         if (id === playerId) continue;
@@ -115,7 +117,6 @@
     function animate() {
       requestAnimationFrame(animate);
 
-      // Movement
       const speed = 0.05;
       if (keys["w"]) playerCube.position.z -= speed;
       if (keys["s"]) playerCube.position.z += speed;
@@ -128,8 +129,6 @@
     }
 
     animate();
-
-    // Initial sync
     updatePlayer();
   </script>
 </body>
