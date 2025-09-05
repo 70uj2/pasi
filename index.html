@@ -4,135 +4,158 @@
   <meta charset="UTF-8">
   <title>Multiplayer Cubes</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { margin:0; overflow:hidden; }
     #colorPicker {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 10px; right: 10px;
       z-index: 10;
     }
   </style>
 </head>
 <body>
-  <input type="color" id="colorPicker" value="#808080">
+  <input type="color" id="colorPicker" value="#888888" />
 
-<!-- Three.js global build (still works fine even if “deprecated” warning shows) -->
-<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
 
-<!-- OrbitControls global build that works with THREE.* -->
-<script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r149/examples/js/controls/OrbitControls.js"></script>
-
-<!-- Firebase compat SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
-    // --- Firebase setup ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-      authDomain: "pasja-data5100s.firebaseapp.com",
-      databaseURL: "https://pasja-data5100s-default-rtdb.firebaseio.com",
-      projectId: "pasja-data5100s",
-      storageBucket: "pasja-data5100s.appspot.com",
-      messagingSenderId: "1042573635103",
-      appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-      measurementId: "G-Z2GYGXQTMZ"
-    };
+  // === Firebase setup with your config ===
+  const firebaseConfig = {
+    apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+    authDomain: "pasja-data5100s.firebaseapp.com",
+    projectId: "pasja-data5100s",
+    storageBucket: "pasja-data5100s.firebasestorage.app",
+    messagingSenderId: "1042573635103",
+    appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+    measurementId: "G-Z2GYGXQTMZ"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  // === Three.js setup ===
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-    // --- Three.js setup ---
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // Light
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 10, 7);
+  scene.add(light);
+
+  // Player cube
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+  const player = new THREE.Mesh(geometry, material);
+  scene.add(player);
+
+  // Remote players
+  const players = {};
+  const playerId = Math.random().toString(36).substr(2, 9);
+
+  // === Camera orbit control (custom) ===
+  let radius = 5;
+  let theta = 0;
+  let phi = Math.PI / 4;
+  let isDragging = false;
+  let lastX, lastY;
+
+  function updateCamera() {
+    camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = radius * Math.cos(phi);
+    camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
+    camera.lookAt(0,0,0);
+  }
+  updateCamera();
+
+  window.addEventListener("mousedown", e => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  window.addEventListener("mouseup", () => isDragging = false);
+  window.addEventListener("mousemove", e => {
+    if (!isDragging) return;
+    let dx = e.clientX - lastX;
+    let dy = e.clientY - lastY;
+    theta -= dx * 0.01;
+    phi -= dy * 0.01;
+    phi = Math.max(0.1, Math.min(Math.PI-0.1, phi)); // clamp vertical
+    updateCamera();
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  window.addEventListener("wheel", e => {
+    radius += e.deltaY * 0.01;
+    radius = Math.max(2, Math.min(20, radius));
+    updateCamera();
+  });
+
+  // === Multiplayer sync ===
+  const playerRef = db.ref("players/" + playerId);
+  playerRef.set({ x:0, y:0, z:0, color:"#888888" });
+  playerRef.onDisconnect().remove();
+
+  // Update player color
+  document.getElementById("colorPicker").addEventListener("input", e => {
+    player.material.color.set(e.target.value);
+    playerRef.update({ color: e.target.value });
+  });
+
+  // Listen for remote players
+  db.ref("players").on("value", snapshot => {
+    const data = snapshot.val() || {};
+    for (let id in data) {
+      if (id === playerId) continue;
+      if (!players[id]) {
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: data[id].color }));
+        scene.add(mesh);
+        players[id] = mesh;
+      }
+      players[id].material.color.set(data[id].color);
+      players[id].position.set(data[id].x, data[id].y, data[id].z);
+    }
+    // Remove disconnected players
+    for (let id in players) {
+      if (!data[id]) {
+        scene.remove(players[id]);
+        delete players[id];
+      }
+    }
+  });
+
+  // === Movement keys (WASD) ===
+  const keys = {};
+  window.addEventListener("keydown", e => keys[e.key] = true);
+  window.addEventListener("keyup", e => keys[e.key] = false);
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    let moved = false;
+    if (keys["w"]) { player.position.z -= 0.05; moved = true; }
+    if (keys["s"]) { player.position.z += 0.05; moved = true; }
+    if (keys["a"]) { player.position.x -= 0.05; moved = true; }
+    if (keys["d"]) { player.position.x += 0.05; moved = true; }
+
+    if (moved) {
+      playerRef.update({ x: player.position.x, y: player.position.y, z: player.position.z });
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    camera.position.set(0, 2, 5);
-    controls.update();
-
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 5);
-    scene.add(light);
-
-    // --- Player cube ---
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
-    const playerCube = new THREE.Mesh(geometry, material);
-    scene.add(playerCube);
-
-    // --- Player state ---
-    const playerId = "player-" + Math.random().toString(36).substring(2, 9);
-    let playerColor = "#808080";
-    let keys = {};
-
-    // Movement
-    window.addEventListener("keydown", e => keys[e.key] = true);
-    window.addEventListener("keyup", e => keys[e.key] = false);
-
-    // Color picker
-    document.getElementById("colorPicker").addEventListener("input", e => {
-      playerColor = e.target.value;
-      playerCube.material.color.set(playerColor);
-    });
-
-    // Other players
-    const players = {};
-
-    function updatePlayer() {
-      db.ref("players/" + playerId).set({
-        x: playerCube.position.x,
-        y: playerCube.position.y,
-        z: playerCube.position.z,
-        color: playerColor
-      });
-    }
-
-    // Remove player when disconnected
-    db.ref("players/" + playerId).onDisconnect().remove();
-
-    // Listen for other players
-    db.ref("players").on("value", snapshot => {
-      const data = snapshot.val() || {};
-      for (const id in data) {
-        if (id === playerId) continue;
-        if (!players[id]) {
-          const cube = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: data[id].color }));
-          scene.add(cube);
-          players[id] = cube;
-        }
-        players[id].position.set(data[id].x, data[id].y, data[id].z);
-        players[id].material.color.set(data[id].color);
-      }
-      // Remove players who left
-      for (const id in players) {
-        if (!data[id]) {
-          scene.remove(players[id]);
-          delete players[id];
-        }
-      }
-    });
-
-    // Game loop
-    function animate() {
-      requestAnimationFrame(animate);
-
-      const speed = 0.05;
-      if (keys["w"]) playerCube.position.z -= speed;
-      if (keys["s"]) playerCube.position.z += speed;
-      if (keys["a"]) playerCube.position.x -= speed;
-      if (keys["d"]) playerCube.position.x += speed;
-
-      updatePlayer();
-      controls.update();
-      renderer.render(scene, camera);
-    }
-
-    animate();
-    updatePlayer();
+  });
   </script>
 </body>
 </html>
