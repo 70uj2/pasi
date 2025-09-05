@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>cube</title>
+  <title>Multiplayer Cubes</title>
   <style>
     body { margin:0; overflow:hidden; }
     #colorPicker {
@@ -16,7 +16,6 @@
   <input type="color" id="colorPicker" value="#888888" />
 
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
@@ -58,10 +57,11 @@
   let lastX, lastY;
 
   function updateCamera() {
-    camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
-    camera.position.y = radius * Math.cos(phi);
-    camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
-    camera.lookAt(0,0,0);
+    const target = player.position;
+    camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = target.y + radius * Math.cos(phi);
+    camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
+    camera.lookAt(target);
   }
   updateCamera();
 
@@ -109,7 +109,6 @@
       players[id].material.color.set(data[id].color);
       players[id].position.set(data[id].x, data[id].y, data[id].z);
     }
-
     for (let id in players) {
       if (!data[id]) {
         scene.remove(players[id]);
@@ -124,17 +123,15 @@
 
   function animate() {
     requestAnimationFrame(animate);
-
     let moved = false;
     if (keys["w"]) { player.position.z -= 0.05; moved = true; }
     if (keys["s"]) { player.position.z += 0.05; moved = true; }
     if (keys["a"]) { player.position.x -= 0.05; moved = true; }
     if (keys["d"]) { player.position.x += 0.05; moved = true; }
-
     if (moved) {
       playerRef.update({ x: player.position.x, y: player.position.y, z: player.position.z });
     }
-
+    updateCamera();
     renderer.render(scene, camera);
   }
   animate();
@@ -147,3 +144,4 @@
   </script>
 </body>
 </html>
+
