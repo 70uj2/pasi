@@ -7,245 +7,160 @@
     body { margin:0; overflow:hidden; }
     #colorPicker {
       position: absolute;
-      top: 10px; right: 10px;
-      z-index: 10;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
     }
   </style>
 </head>
 <body>
-<input type="color" id="colorPicker" value="#888888" />
+  <input type="color" id="colorPicker" value="#ff0000">
 
-<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
 
-<script>
-window.addEventListener("contextmenu", e => e.preventDefault());
+    // Scene setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-  authDomain: "pasja-data5100s.firebaseapp.com",
-  projectId: "pasja-data5100s",
-  storageBucket: "pasja-data5100s.firebasestorage.app",
-  messagingSenderId: "1042573635103",
-  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-  measurementId: "G-Z2GYGXQTMZ"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+    const controls = new OrbitControls(camera, renderer.domElement);
+    camera.position.set(0, 5, 10);
+    controls.update();
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+    // Lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
 
-// Character model instead of cube
-function createCharacter(color) {
-  const mat = new THREE.MeshStandardMaterial({ color });
-  const group = new THREE.Group();
+    // Ground
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(50, 50),
+      new THREE.MeshPhongMaterial({ color: 0x808080 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
-  head.position.y = 3.25;
-  head.castShadow = true;
-  head.name = "head";
-  group.add(head);
+    // Player model (Roblox-style proportions)
+    function createPlayer(color = 0xff0000) {
+      const group = new THREE.Group();
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
-  torso.position.y = 1.5;
-  torso.castShadow = true;
-  torso.name = "torso";
-  group.add(torso);
+      const material = new THREE.MeshPhongMaterial({ color });
 
-  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
-  leftArm.position.set(-1.5, 1.5, 0);
-  leftArm.castShadow = true;
-  leftArm.name = "leftArm";
-  group.add(leftArm);
+      // Torso
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), material);
+      torso.position.y = 3;
+      group.add(torso);
 
-  const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
-  rightArm.position.set(1.5, 1.5, 0);
-  rightArm.castShadow = true;
-  rightArm.name = "rightArm";
-  group.add(rightArm);
+      // Head
+      const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), material);
+      head.position.y = 4.75;
+      group.add(head);
 
-  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
-  leftLeg.position.set(-0.5, -0.5, 0);
-  leftLeg.castShadow = true;
-  leftLeg.name = "leftLeg";
-  group.add(leftLeg);
+      // Arms
+      const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), material);
+      leftArm.position.set(-1.5, 3.5, 0);
+      leftArm.name = "leftArm";
+      group.add(leftArm);
 
-  const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
-  rightLeg.position.set(0.5, -0.5, 0);
-  rightLeg.castShadow = true;
-  rightLeg.name = "rightLeg";
-  group.add(rightLeg);
+      const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), material);
+      rightArm.position.set(1.5, 3.5, 0);
+      rightArm.name = "rightArm";
+      group.add(rightArm);
 
-  return group;
-}
+      // Legs
+      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), material);
+      leftLeg.position.set(-0.5, 1, 0);
+      leftLeg.name = "leftLeg";
+      group.add(leftLeg);
 
-const player = createCharacter(0x888888);
-scene.add(player);
+      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), material);
+      rightLeg.position.set(0.5, 1, 0);
+      rightLeg.name = "rightLeg";
+      group.add(rightLeg);
 
-const players = {};
-const playerId = Math.random().toString(36).substr(2, 9);
-
-let radius = 5;
-let theta = 0;
-let phi = Math.PI/4;
-let isDragging = false;
-let lastX, lastY;
-
-function updateCamera() {
-  const target = player.position;
-  camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
-  camera.position.y = target.y + radius * Math.cos(phi);
-  camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
-  camera.lookAt(target);
-}
-updateCamera();
-
-window.addEventListener("mousedown", e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
-window.addEventListener("mouseup", () => isDragging = false);
-window.addEventListener("mousemove", e => {
-  if (!isDragging) return;
-  let dx = e.clientX - lastX;
-  let dy = e.clientY - lastY;
-  theta -= dx * 0.01;
-  phi -= dy * 0.01;
-  phi = Math.max(0.1, Math.min(Math.PI-0.1, phi));
-  updateCamera();
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
-window.addEventListener("wheel", e => {
-  radius += e.deltaY*0.01;
-  radius = Math.max(2, Math.min(20, radius));
-  updateCamera();
-});
-
-const playerRef = db.ref("players/" + playerId);
-playerRef.set({ x:0, y:0, z:0, color:"#888888" });
-playerRef.onDisconnect().remove();
-
-document.getElementById("colorPicker").addEventListener("input", e => {
-  player.traverse(obj => {
-    if (obj.isMesh) obj.material.color.set(e.target.value);
-  });
-  playerRef.update({ color:e.target.value });
-});
-
-db.ref("players").on("value", snapshot => {
-  const data = snapshot.val() || {};
-  for (let id in data) {
-    if (id===playerId) continue;
-    if (!players[id]) {
-      const mesh = createCharacter(data[id].color);
-      mesh.castShadow = true;
-      scene.add(mesh);
-      players[id] = mesh;
+      return group;
     }
-    players[id].traverse(obj => {
-      if (obj.isMesh) obj.material.color.set(data[id].color);
+
+    const player = createPlayer();
+    scene.add(player);
+
+    // Controls
+    const keys = {};
+    document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+    // 2014 Walk Animation (from uploaded video)
+    let walkTime = 0;
+    function animateWalk(character, moving, delta) {
+      const leftArm = character.getObjectByName("leftArm");
+      const rightArm = character.getObjectByName("rightArm");
+      const leftLeg = character.getObjectByName("leftLeg");
+      const rightLeg = character.getObjectByName("rightLeg");
+
+      if (!leftArm || !rightArm || !leftLeg || !rightLeg) return;
+
+      if (moving) {
+        // speed tuned to ~40 frames per cycle @30fps ≈ 1.33s per cycle
+        walkTime += delta * 4.7;
+
+        // Arms swing wider (~45°)
+        const armSwing = Math.sin(walkTime) * (Math.PI / 4); // ±45°
+        // Legs swing narrower (~30°)
+        const legSwing = Math.sin(walkTime) * (Math.PI / 6); // ±30°
+
+        leftArm.rotation.x = armSwing;
+        rightArm.rotation.x = -armSwing;
+        leftLeg.rotation.x = -legSwing;
+        rightLeg.rotation.x = legSwing;
+      } else {
+        // Reset smoothly toward idle
+        leftArm.rotation.x *= 0.8;
+        rightArm.rotation.x *= 0.8;
+        leftLeg.rotation.x *= 0.8;
+        rightLeg.rotation.x *= 0.8;
+      }
+    }
+
+    // Update loop
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      let moving = false;
+      const speed = 5 * delta;
+
+      if (keys["w"]) { player.position.z -= speed; moving = true; }
+      if (keys["s"]) { player.position.z += speed; moving = true; }
+      if (keys["a"]) { player.position.x -= speed; moving = true; }
+      if (keys["d"]) { player.position.x += speed; moving = true; }
+
+      animateWalk(player, moving, delta);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Color picker
+    document.getElementById("colorPicker").addEventListener("input", (e) => {
+      player.traverse(child => {
+        if (child.isMesh) child.material.color.set(e.target.value);
+      });
     });
-    players[id].position.set(data[id].x, data[id].y, data[id].z);
-  }
-  for (let id in players) {
-    if (!data[id]) {
-      scene.remove(players[id]);
-      delete players[id];
-    }
-  }
-});
 
-const keys = {};
-window.addEventListener("keydown", e => keys[e.key]=true);
-window.addEventListener("keyup", e => keys[e.key]=false);
-
-// Checkered floor
-const floorSize = 200;
-const tiles = 20;
-const floorCanvas = document.createElement("canvas");
-floorCanvas.width = floorCanvas.height = 512;
-const ctx = floorCanvas.getContext("2d");
-for (let y=0;y<8;y++){
-  for(let x=0;x<8;x++){
-    ctx.fillStyle = (x+y)%2===0 ? "#ffffff" : "#999999";
-    ctx.fillRect(x*64,y*64,64,64);
-  }
-}
-const floorTexture = new THREE.CanvasTexture(floorCanvas);
-floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
-floorTexture.repeat.set(tiles, tiles);
-const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture, side: THREE.DoubleSide });
-const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMaterial);
-floorMesh.rotation.x = -Math.PI/2;
-floorMesh.receiveShadow = true;
-scene.add(floorMesh);
-
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff,0.6);
-scene.add(ambientLight);
-
-const sunLight = new THREE.DirectionalLight(0xffffff,1);
-sunLight.position.set(50,100,50);
-sunLight.castShadow = true;
-sunLight.shadow.mapSize.width=2048;
-sunLight.shadow.mapSize.height=2048;
-sunLight.shadow.camera.near = 0.5;
-sunLight.shadow.camera.far = 500;
-scene.add(sunLight);
-
-// Walk animation vars
-let walkTime = 0;
-function animateWalk(character, moving, delta) {
-  const leftArm = character.getObjectByName("leftArm");
-  const rightArm = character.getObjectByName("rightArm");
-  const leftLeg = character.getObjectByName("leftLeg");
-  const rightLeg = character.getObjectByName("rightLeg");
-
-  if (!leftArm || !rightArm || !leftLeg || !rightLeg) return;
-
-  if (moving) {
-    walkTime += delta * 5; // speed
-    const swing = Math.sin(walkTime) * 0.8;
-    leftArm.rotation.x = swing;
-    rightArm.rotation.x = -swing;
-    leftLeg.rotation.x = -swing;
-    rightLeg.rotation.x = swing;
-  } else {
-    // Reset smoothly
-    leftArm.rotation.x *= 0.8;
-    rightArm.rotation.x *= 0.8;
-    leftLeg.rotation.x *= 0.8;
-    rightLeg.rotation.x *= 0.8;
-  }
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  let moved=false;
-  if (keys["w"]){player.position.z-=0.05;moved=true;}
-  if (keys["s"]){player.position.z+=0.05;moved=true;}
-  if (keys["a"]){player.position.x-=0.05;moved=true;}
-  if (keys["d"]){player.position.x+=0.05;moved=true;}
-
-  if (moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
-
-  // Animate walking like 2014 Roblox
-  animateWalk(player, moved, 0.016);
-
-  updateCamera();
-  renderer.render(scene,camera);
-}
-animate();
-
-window.addEventListener("resize",()=>{
-  camera.aspect=window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
-});
-</script>
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
