@@ -109,70 +109,118 @@
     }
 
     // Hat models
-    function makeHat(type) {
-      let hat;
-      switch(type) {
-        case "valkyrie":
-          hat = new THREE.Group();
-          const helm = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.6,1.3), new THREE.MeshStandardMaterial({ color:0x8888ff }));
-          helm.position.y = 0.4;
-          hat.add(helm);
-          const wing1 = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.6,1), new THREE.MeshStandardMaterial({ color:0xffffff }));
-          wing1.position.set(-0.8,0.5,0);
-          hat.add(wing1);
-          const wing2 = wing1.clone(); wing2.position.x = 0.8; hat.add(wing2);
-          break;
-        case "topHat":
-          hat = new THREE.Group();
-          const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.2,16), new THREE.MeshStandardMaterial({ color:0x000000 }));
-          brim.position.y = 0;
-          const tall = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.2,16), new THREE.MeshStandardMaterial({ color:0x000000 }));
-          tall.position.y = 0.7;
-          hat.add(brim); hat.add(tall);
-          break;
-        case "hood":
-          hat = new THREE.Mesh(new THREE.SphereGeometry(0.9,16,16,0,Math.PI*2,0,Math.PI/2), 
-            new THREE.MeshStandardMaterial({ color:0x00aa66, side:THREE.DoubleSide }));
-          hat.position.y = 0.2;
-          break;
-        case "sunglasses":
-          hat = new THREE.Group();
-          const glassMat = new THREE.MeshStandardMaterial({ color:0x111111 });
-          const lens1 = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.05), glassMat);
-          const lens2 = lens1.clone();
-          lens1.position.set(-0.35,0,0.65);
-          lens2.position.set(0.35,0,0.65);
-          hat.add(lens1); hat.add(lens2);
-          const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.05), glassMat);
-          bridge.position.set(0,0,0.65);
-          hat.add(bridge);
-          break;
+// Hat models (improved detail)
+function makeHat(type) {
+  let hat;
+  switch(type) {
+    case "valkyrie":
+      hat = new THREE.Group();
+      const helm = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7,0.9,0.6,24,1,true),
+        new THREE.MeshStandardMaterial({ color:0x555577, metalness:0.6, roughness:0.3 })
+      );
+      helm.position.y = 0.3;
+      hat.add(helm);
+
+      // gem
+      const gem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.2),
+        new THREE.MeshStandardMaterial({ color:0x44aaff, emissive:0x2255ff })
+      );
+      gem.position.set(0,0.35,0.8);
+      hat.add(gem);
+
+      // wings
+      const featherMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.8 });
+      for (let side of [-1,1]) {
+        for (let i=0;i<4;i++) {
+          const feather = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1,0.5,0.15),
+            featherMat
+          );
+          feather.position.set(side*0.9,0.5+i*0.4,-0.1*i);
+          feather.rotation.z = side*0.2;
+          hat.add(feather);
+        }
       }
-      if(hat) hat.name = "hat";
-      return hat;
-    }
+      break;
 
-    const player = createCharacter(0x888888);
-    scene.add(player);
-    const players = {};
-    const playerId = Math.random().toString(36).substr(2,9);
+    case "topHat":
+      hat = new THREE.Group();
+      const brim = new THREE.Mesh(
+        new THREE.CylinderGeometry(1,1,0.15,32),
+        new THREE.MeshStandardMaterial({ color:0x000000, roughness:0.4 })
+      );
+      brim.position.y = 0;
+      hat.add(brim);
 
-    // Helpers to manage hats
-    function applyHat(character, hatName) {
-      // remove old hat
-      const old = character.getObjectByName("hat");
-      if(old) old.parent.remove(old);
+      const tall = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7,0.7,1.6,32),
+        new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.3 })
+      );
+      tall.position.y = 0.9;
+      hat.add(tall);
 
-      if(!hatName) return;
-      const head = character.getObjectByName("head");
-      if(!head) return;
+      const band = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.72,0.72,0.2,32),
+        new THREE.MeshStandardMaterial({ color:0xaa0000, metalness:0.2 })
+      );
+      band.position.y = 0.2;
+      hat.add(band);
+      break;
 
-      const newHat = makeHat(hatName);
-      if(newHat) {
-        head.add(newHat);
-        newHat.position.y = 0.8; // sit above head
+    case "hood":
+      hat = new THREE.Group();
+      const hoodMat = new THREE.MeshStandardMaterial({ color:0x00aa66, side:THREE.DoubleSide, roughness:0.7 });
+      const outer = new THREE.Mesh(
+        new THREE.SphereGeometry(1.0,24,16,0,Math.PI*2,0,Math.PI/2),
+        hoodMat
+      );
+      outer.scale.set(1,1.2,1);
+      outer.position.y = 0.4;
+      hat.add(outer);
+
+      // rim
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(1,0.1,8,24,Math.PI),
+        new THREE.MeshStandardMaterial({ color:0x007744 })
+      );
+      rim.rotation.x = Math.PI/2;
+      rim.position.y = 0.1;
+      hat.add(rim);
+
+      break;
+
+    case "sunglasses":
+      hat = new THREE.Group();
+      const glassMat = new THREE.MeshStandardMaterial({ color:0x222222, metalness:0.6, roughness:0.2 });
+      const frameMat = new THREE.MeshStandardMaterial({ color:0x000000, metalness:0.8 });
+
+      const lens1 = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.05,16), glassMat);
+      const lens2 = lens1.clone();
+      lens1.rotation.x = Math.PI/2;
+      lens2.rotation.x = Math.PI/2;
+      lens1.position.set(-0.45,0,0.7);
+      lens2.position.set(0.45,0,0.7);
+      hat.add(lens1); hat.add(lens2);
+
+      // bridge
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.05), frameMat);
+      bridge.position.set(0,0,0.7);
+      hat.add(bridge);
+
+      // temples
+      for (let side of [-1,1]) {
+        const temple = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.6), frameMat);
+        temple.position.set(side*0.65,0,0.4);
+        hat.add(temple);
       }
-    }
+      break;
+  }
+  if(hat) hat.name = "hat";
+  return hat;
+}
+
 
     // Firebase refs
     const playerRef = db.ref("players/"+playerId);
