@@ -49,31 +49,37 @@ function createCharacter(color) {
   const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
   head.position.y = 3.25;
   head.castShadow = true;
+  head.name = "head";
   group.add(head);
 
   const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
   torso.position.y = 1.5;
   torso.castShadow = true;
+  torso.name = "torso";
   group.add(torso);
 
   const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
   leftArm.position.set(-1.5, 1.5, 0);
   leftArm.castShadow = true;
+  leftArm.name = "leftArm";
   group.add(leftArm);
 
   const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
   rightArm.position.set(1.5, 1.5, 0);
   rightArm.castShadow = true;
+  rightArm.name = "rightArm";
   group.add(rightArm);
 
   const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
   leftLeg.position.set(-0.5, -0.5, 0);
   leftLeg.castShadow = true;
+  leftLeg.name = "leftLeg";
   group.add(leftLeg);
 
   const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
   rightLeg.position.set(0.5, -0.5, 0);
   rightLeg.castShadow = true;
+  rightLeg.name = "rightLeg";
   group.add(rightLeg);
 
   return group;
@@ -191,6 +197,32 @@ sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 500;
 scene.add(sunLight);
 
+// Walk animation vars
+let walkTime = 0;
+function animateWalk(character, moving, delta) {
+  const leftArm = character.getObjectByName("leftArm");
+  const rightArm = character.getObjectByName("rightArm");
+  const leftLeg = character.getObjectByName("leftLeg");
+  const rightLeg = character.getObjectByName("rightLeg");
+
+  if (!leftArm || !rightArm || !leftLeg || !rightLeg) return;
+
+  if (moving) {
+    walkTime += delta * 5; // speed
+    const swing = Math.sin(walkTime) * 0.8;
+    leftArm.rotation.x = swing;
+    rightArm.rotation.x = -swing;
+    leftLeg.rotation.x = -swing;
+    rightLeg.rotation.x = swing;
+  } else {
+    // Reset smoothly
+    leftArm.rotation.x *= 0.8;
+    rightArm.rotation.x *= 0.8;
+    leftLeg.rotation.x *= 0.8;
+    rightLeg.rotation.x *= 0.8;
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   let moved=false;
@@ -198,7 +230,12 @@ function animate() {
   if (keys["s"]){player.position.z+=0.05;moved=true;}
   if (keys["a"]){player.position.x-=0.05;moved=true;}
   if (keys["d"]){player.position.x+=0.05;moved=true;}
+
   if (moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
+
+  // Animate walking like 2014 Roblox
+  animateWalk(player, moved, 0.016);
+
   updateCamera();
   renderer.render(scene,camera);
 }
