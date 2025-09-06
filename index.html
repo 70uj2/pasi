@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Hats with UI</title>
+  <title>Firebase Hats Multiplayer</title>
   <style>
     body { margin:0; overflow:hidden; background:#111; }
     #ui {
@@ -27,13 +27,32 @@
   <button onclick="equipHat('hood')">Viridian Hood</button>
   <button onclick="equipHat('sunglasses')">Sunglasses</button>
 </div>
-<script type="module">
-import * as THREE from './three.module.js';
-import { io } from './socket.io.esm.min.js';
 
-const socket = io();
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-// Scene setup
+<script>
+// --- Firebase Setup ---
+const firebaseConfig = {
+  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+  authDomain: "pasja-data5100s.firebaseapp.com",
+  databaseURL: "https://pasja-data5100s-default-rtdb.firebaseio.com", // ✅ required
+  projectId: "pasja-data5100s",
+  storageBucket: "pasja-data5100s.firebasestorage.app",
+  messagingSenderId: "1042573635103",
+  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+  measurementId: "G-Z2GYGXQTMZ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const myId = Math.random().toString(36).substr(2,9);
+const myRef = db.ref("players/" + myId);
+myRef.set({ x:0, y:0, z:0, hat:null });
+myRef.onDisconnect().remove();
+
+// --- Three.js Setup ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
 
@@ -44,13 +63,11 @@ const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Light
 const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(5,10,5);
 scene.add(light);
 scene.add(new THREE.AmbientLight(0x555555));
 
-// Ground
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(50,50),
   new THREE.MeshStandardMaterial({color:0x444444})
@@ -58,11 +75,8 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// Players
+// --- Players ---
 const players = {};
-let myId = null;
-
-// Make player model
 function makePlayer(id) {
   const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({color: id===myId?0x00ff00:0x3399ff});
@@ -73,7 +87,7 @@ function makePlayer(id) {
   return group;
 }
 
-// Hat models (detailed)
+// --- Hats ---
 function makeHat(type) {
   let hat;
   switch(type) {
@@ -83,16 +97,12 @@ function makeHat(type) {
         new THREE.CylinderGeometry(0.7,0.9,0.6,24,1,true),
         new THREE.MeshStandardMaterial({ color:0x555577, metalness:0.6, roughness:0.3 })
       );
-      helm.position.y = 0.3;
-      hat.add(helm);
-
+      helm.position.y = 0.3; hat.add(helm);
       const gem = new THREE.Mesh(
         new THREE.OctahedronGeometry(0.2),
         new THREE.MeshStandardMaterial({ color:0x44aaff, emissive:0x2255ff })
       );
-      gem.position.set(0,0.35,0.8);
-      hat.add(gem);
-
+      gem.position.set(0,0.35,0.8); hat.add(gem);
       const featherMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.8 });
       for (let side of [-1,1]) {
         for (let i=0;i<4;i++) {
@@ -111,20 +121,16 @@ function makeHat(type) {
         new THREE.MeshStandardMaterial({ color:0x000000, roughness:0.4 })
       );
       hat.add(brim);
-
       const tall = new THREE.Mesh(
         new THREE.CylinderGeometry(0.7,0.7,1.6,32),
         new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.3 })
       );
-      tall.position.y = 0.9;
-      hat.add(tall);
-
+      tall.position.y = 0.9; hat.add(tall);
       const band = new THREE.Mesh(
         new THREE.CylinderGeometry(0.72,0.72,0.2,32),
         new THREE.MeshStandardMaterial({ color:0xaa0000, metalness:0.2 })
       );
-      band.position.y = 0.2;
-      hat.add(band);
+      band.position.y = 0.2; hat.add(band);
       break;
 
     case "hood":
@@ -134,36 +140,25 @@ function makeHat(type) {
         new THREE.SphereGeometry(1.0,24,16,0,Math.PI*2,0,Math.PI/2),
         hoodMat
       );
-      outer.scale.set(1,1.2,1);
-      outer.position.y = 0.4;
-      hat.add(outer);
-
+      outer.scale.set(1,1.2,1); outer.position.y = 0.4; hat.add(outer);
       const rim = new THREE.Mesh(
         new THREE.TorusGeometry(1,0.1,8,24,Math.PI),
         new THREE.MeshStandardMaterial({ color:0x007744 })
       );
-      rim.rotation.x = Math.PI/2;
-      rim.position.y = 0.1;
-      hat.add(rim);
+      rim.rotation.x = Math.PI/2; rim.position.y = 0.1; hat.add(rim);
       break;
 
     case "sunglasses":
       hat = new THREE.Group();
       const glassMat = new THREE.MeshStandardMaterial({ color:0x222222, metalness:0.6, roughness:0.2 });
       const frameMat = new THREE.MeshStandardMaterial({ color:0x000000, metalness:0.8 });
-
       const lens1 = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.05,16), glassMat);
       const lens2 = lens1.clone();
-      lens1.rotation.x = Math.PI/2;
-      lens2.rotation.x = Math.PI/2;
-      lens1.position.set(-0.45,0,0.7);
-      lens2.position.set(0.45,0,0.7);
+      lens1.rotation.x = Math.PI/2; lens2.rotation.x = Math.PI/2;
+      lens1.position.set(-0.45,0,0.7); lens2.position.set(0.45,0,0.7);
       hat.add(lens1); hat.add(lens2);
-
       const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.05), frameMat);
-      bridge.position.set(0,0,0.7);
-      hat.add(bridge);
-
+      bridge.position.set(0,0,0.7); hat.add(bridge);
       for (let side of [-1,1]) {
         const temple = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.6), frameMat);
         temple.position.set(side*0.65,0,0.4);
@@ -172,49 +167,51 @@ function makeHat(type) {
       break;
   }
   if(hat) hat.name = "hat";
-  hat.position.y = 2.1; // sit on head
+  hat.position.y = 2.1;
   return hat;
 }
 
-// Equip hat function (UI calls this)
-window.equipHat = function(type) {
-  socket.emit("equipHat", type);
-};
+// --- Equip hat (writes to Firebase) ---
+function equipHat(type) {
+  myRef.set({ x:0,y:0,z:0, hat:type });
+}
 
-// Socket events
-socket.on("connect", () => { myId = socket.id; });
-
-socket.on("playerData", data => {
+// --- Listen for players in DB ---
+db.ref("players").on("value", snapshot => {
+  const data = snapshot.val() || {};
   for (let id in data) {
     if (!players[id]) {
       const model = makePlayer(id);
       scene.add(model);
       players[id] = model;
     }
+    const hatType = data[id].hat;
+    const model = players[id];
+    if (model.userData.hat) {
+      model.remove(model.userData.hat);
+      model.userData.hat = null;
+    }
+    if (hatType) {
+      const hat = makeHat(hatType);
+      model.add(hat);
+      model.userData.hat = hat;
+    }
+  }
+  // remove disconnected
+  for (let id in players) {
+    if (!data[id]) {
+      scene.remove(players[id]);
+      delete players[id];
+    }
   }
 });
 
-socket.on("hatUpdate", ({id, type}) => {
-  const player = players[id];
-  if (!player) return;
-  if (player.userData.hat) {
-    player.remove(player.userData.hat);
-    player.userData.hat = null;
-  }
-  if (type) {
-    const hat = makeHat(type);
-    player.add(hat);
-    player.userData.hat = hat;
-  }
-});
-
-// Render
+// --- Render loop ---
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
 }
 animate();
-
 </script>
 </body>
 </html>
