@@ -1,237 +1,243 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Multiplayer Hats GLB</title>
-<style>
-  body { margin:0; overflow:hidden; background:#111; }
-  #colorPicker { position:absolute; top:10px; right:10px; z-index:10; }
-  #ui {
-    position:absolute; top:10px; left:10px;
-    background:rgba(0,0,0,0.6);
-    padding:10px; border-radius:8px;
-    display:flex; flex-direction:column; gap:6px; z-index:10;
-  }
-  #ui button {
-    padding:6px 10px; font-size:14px;
-    border:none; border-radius:4px;
-    background:#333; color:#fff;
-    cursor:pointer;
-  }
-  #ui button.active { background:#1e88e5; }
-  #ui button:hover { background:#555; }
-</style>
+  <meta charset="UTF-8">
+  <title>Multiplayer Cubes</title>
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+    }
+    #colorPicker { 
+      position: absolute; 
+      top: 10px; 
+      right: 10px; 
+      z-index: 10; 
+    }
+  </style>
 </head>
 <body>
-<div id="ui">
-  <button data-hat="antlers">Antlers</button>
-  <button data-hat="hood">Hood</button>
-  <button data-hat="">Remove Hat</button>
-</div>
-<input type="color" id="colorPicker" value="#888888" />
+  <input type="color" id="colorPicker" value="#888888" />
 
-<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-<!-- Fixed global GLTFLoader -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-<script>
-// Prevent right-click menu
-window.addEventListener("contextmenu", e => e.preventDefault());
+  <script>
+    window.addEventListener("contextmenu", e => e.preventDefault());
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-  authDomain: "pasja-data5100s.firebaseapp.com",
-  databaseURL: "https://pasja-data5100s-default-rtdb.firebaseio.com",
-  projectId: "pasja-data5100s",
-  storageBucket: "pasja-data5100s.firebasestorage.app",
-  messagingSenderId: "1042573635103",
-  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-  measurementId: "G-Z2GYGXQTMZ"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+    // Firebase setup
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+      authDomain: "pasja-data5100s.firebaseapp.com",
+      projectId: "pasja-data5100s",
+      storageBucket: "pasja-data5100s.firebasestorage.app",
+      messagingSenderId: "1042573635103",
+      appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+      measurementId: "G-Z2GYGXQTMZ"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-// Player id and DB reference
-const playerId = Math.random().toString(36).substr(2,9);
-const playerRef = db.ref("players/" + playerId);
-playerRef.set({ x:0, y:0, z:0, color:"#888888", hat:null });
-playerRef.onDisconnect().remove();
+    // Three.js setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 
-// Scene, camera, renderer
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202020);
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
 
-// Lights
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-const sun = new THREE.DirectionalLight(0xffffff,1);
-sun.position.set(50,100,50);
-sun.castShadow = true;
-sun.shadow.mapSize.width = sun.shadow.mapSize.height = 2048;
-scene.add(sun);
+    // Character model
+    function createCharacter(color) {
+      const mat = new THREE.MeshStandardMaterial({ color });
+      const group = new THREE.Group();
 
-// Checkered floor
-const floorSize = 200, tiles = 20;
-const floorCanvas = document.createElement("canvas");
-floorCanvas.width = floorCanvas.height = 512;
-const ctx = floorCanvas.getContext("2d");
-for(let y=0;y<8;y++){for(let x=0;x<8;x++){ctx.fillStyle=(x+y)%2===0?"#ffffff":"#999999";ctx.fillRect(x*64,y*64,64,64);}}
-const floorTexture = new THREE.CanvasTexture(floorCanvas);
-floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
-floorTexture.repeat.set(tiles, tiles);
-const floorMat = new THREE.MeshStandardMaterial({ map:floorTexture, side:THREE.DoubleSide });
-const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(floorSize,floorSize), floorMat);
-floorMesh.rotation.x = -Math.PI/2;
-floorMesh.receiveShadow = true;
-scene.add(floorMesh);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
+      head.position.y = 3.25;
+      head.castShadow = true;
+      group.add(head);
 
-// Character
-function createCharacter(color){
-  const mat = new THREE.MeshStandardMaterial({ color });
-  const group = new THREE.Group();
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,1.25), mat);
-  head.position.y=3.25; head.castShadow=true; head.name="head"; group.add(head);
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(2,2,1), mat);
-  torso.position.y=1.5; torso.castShadow=true; group.add(torso);
-  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-  leftArm.position.set(-1.5,1.5,0); leftArm.castShadow=true; group.add(leftArm);
-  const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-  rightArm.position.set(1.5,1.5,0); rightArm.castShadow=true; group.add(rightArm);
-  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-  leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow=true; group.add(leftLeg);
-  const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-  rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow=true; group.add(rightLeg);
-  return group;
-}
-const player = createCharacter("#888888");
-scene.add(player);
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
+      torso.position.y = 1.5;
+      torso.castShadow = true;
+      group.add(torso);
 
-// Other players
-const players = {};
+      const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+      leftArm.position.set(-1.5, 1.5, 0);
+      leftArm.castShadow = true;
+      group.add(leftArm);
 
-// GLTFLoader for hats (global version works now)
-const loader = new THREE.GLTFLoader();
-const glbCache = {};
+      const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+      rightArm.position.set(1.5, 1.5, 0);
+      rightArm.castShadow = true;
+      group.add(rightArm);
 
-function loadGLB(url, onLoad){
-  if(glbCache[url]) { onLoad(glbCache[url].clone()); return; }
-  loader.load(url, gltf=>{ glbCache[url]=gltf.scene; onLoad(gltf.scene.clone()); });
-}
+      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+      leftLeg.position.set(-0.5, -0.5, 0);
+      leftLeg.castShadow = true;
+      group.add(leftLeg);
 
-// Attach hat
-function attachHatToCharacter(characterGroup, hatType){
-  const head = characterGroup.getObjectByName("head");
-  if(!head) return;
-  const oldHat = head.getObjectByName("hat");
-  if(oldHat) head.remove(oldHat);
-  if(!hatType) return;
+      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+      rightLeg.position.set(0.5, -0.5, 0);
+      rightLeg.castShadow = true;
+      group.add(rightLeg);
 
-  let url = null;
-  if(hatType==="antlers") url="https://files.catbox.moe/j1tcat.glb";
-  else if(hatType==="hood") url="https://files.catbox.moe/6ysvsg.glb";
-  if(!url) return;
-
-  loadGLB(url, hat=>{
-    hat.name="hat"; hat.position.set(0,0.9,0);
-    head.add(hat);
-  });
-}
-
-// Camera orbit
-let radius=5, theta=0, phi=Math.PI/4, isDragging=false, lastX=0, lastY=0;
-function updateCamera(){
-  const t=player.position;
-  camera.position.x = t.x + radius*Math.sin(phi)*Math.cos(theta);
-  camera.position.y = t.y + radius*Math.cos(phi);
-  camera.position.z = t.z + radius*Math.sin(phi)*Math.sin(theta);
-  camera.lookAt(t);
-}
-updateCamera();
-window.addEventListener("mousedown", e=>{ isDragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener("mouseup", ()=>isDragging=false);
-window.addEventListener("mousemove", e=>{
-  if(!isDragging) return;
-  const dx=e.clientX-lastX, dy=e.clientY-lastY;
-  theta -= dx*0.01; phi -= dy*0.01;
-  phi=Math.max(0.1, Math.min(Math.PI-0.1, phi));
-  updateCamera();
-  lastX=e.clientX; lastY=e.clientY;
-});
-window.addEventListener("wheel", e=>{ radius += e.deltaY*0.01; radius=Math.max(2, Math.min(50,radius)); updateCamera(); });
-
-// Movement
-const keys={};
-window.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
-const speed = 0.06;
-
-// Color picker
-const colorPicker = document.getElementById("colorPicker");
-colorPicker.addEventListener("input", e=>{
-  const c=e.target.value;
-  player.traverse(o=>{ if(o.isMesh) o.material.color.set(c); });
-  playerRef.update({ color:c });
-});
-
-// UI buttons
-const uiButtons=document.querySelectorAll("#ui button");
-uiButtons.forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    const hatType = btn.getAttribute("data-hat")||null;
-    attachHatToCharacter(player, hatType);
-    playerRef.update({ hat: hatType });
-    uiButtons.forEach(b=>b.classList.remove("active"));
-    if(hatType) btn.classList.add("active");
-  });
-});
-
-// Firebase listener
-db.ref("players").on("value", snapshot=>{
-  const data = snapshot.val()||{};
-  for(const id in data){
-    const p=data[id];
-    if(id===playerId){
-      if(p.color) { player.traverse(o=>{if(o.isMesh)o.material.color.set(p.color);}); colorPicker.value=p.color; }
-      if(p.hat!==undefined) { attachHatToCharacter(player,p.hat); }
-      continue;
+      return group;
     }
-    if(!players[id]){
-      const mesh=createCharacter(p.color||"#888888");
-      scene.add(mesh);
-      players[id]={ mesh, hatType:null };
-    }
-    const rec=players[id];
-    rec.mesh.position.set(p.x||0,p.y||0,p.z||0);
-    if(rec.hatType!==p.hat){
-      attachHatToCharacter(rec.mesh, p.hat);
-      rec.hatType=p.hat||null;
-    }
-  }
-  for(const id in players){ if(!data[id]){ scene.remove(players[id].mesh); delete players[id]; } }
-});
 
-// Animate
-function animate(){
-  requestAnimationFrame(animate);
-  let moved=false;
-  if(keys["w"]){ player.position.z-=speed; moved=true; }
-  if(keys["s"]){ player.position.z+=speed; moved=true; }
-  if(keys["a"]){ player.position.x-=speed; moved=true; }
-  if(keys["d"]){ player.position.x+=speed; moved=true; }
-  if(moved) playerRef.update({ x:player.position.x, y:player.position.y, z:player.position.z });
-  updateCamera();
-  renderer.render(scene,camera);
-}
-animate();
+    const player = createCharacter(0x888888);
+    scene.add(player);
 
-window.addEventListener("resize", ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
-</script>
+    const players = {};
+    const playerId = Math.random().toString(36).substr(2, 9);
+
+    // Camera controls
+    let radius = 5, theta = 0, phi = Math.PI / 4;
+    let isDragging = false, lastX, lastY;
+
+    function updateCamera() {
+      const target = player.position;
+      camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
+      camera.position.y = target.y + radius * Math.cos(phi);
+      camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
+      camera.lookAt(target);
+    }
+    updateCamera();
+
+    window.addEventListener("mousedown", e => {
+      isDragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+    });
+    window.addEventListener("mouseup", () => isDragging = false);
+    window.addEventListener("mousemove", e => {
+      if (!isDragging) return;
+      let dx = e.clientX - lastX;
+      let dy = e.clientY - lastY;
+      theta -= dx * 0.01;
+      phi -= dy * 0.01;
+      phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
+      updateCamera();
+      lastX = e.clientX;
+      lastY = e.clientY;
+    });
+    window.addEventListener("wheel", e => {
+      radius += e.deltaY * 0.01;
+      radius = Math.max(2, Math.min(20, radius));
+      updateCamera();
+    });
+
+    // Firebase player sync
+    const playerRef = db.ref("players/" + playerId);
+    playerRef.set({ x: 0, y: 0, z: 0, color: "#888888" });
+    playerRef.onDisconnect().remove();
+
+    document.getElementById("colorPicker").addEventListener("input", e => {
+      player.traverse(obj => {
+        if (obj.isMesh) obj.material.color.set(e.target.value);
+      });
+      playerRef.update({ color: e.target.value });
+    });
+
+    db.ref("players").on("value", snapshot => {
+      const data = snapshot.val() || {};
+      for (let id in data) {
+        if (id === playerId) continue;
+        if (!players[id]) {
+          const mesh = createCharacter(data[id].color);
+          mesh.castShadow = true;
+          scene.add(mesh);
+          players[id] = mesh;
+        }
+        players[id].traverse(obj => {
+          if (obj.isMesh) obj.material.color.set(data[id].color);
+        });
+        players[id].position.set(data[id].x, data[id].y, data[id].z);
+      }
+      for (let id in players) {
+        if (!data[id]) {
+          scene.remove(players[id]);
+          delete players[id];
+        }
+      }
+    });
+
+    // Movement
+    const keys = {};
+    window.addEventListener("keydown", e => keys[e.key] = true);
+    window.addEventListener("keyup", e => keys[e.key] = false);
+
+    // Checkered floor
+    const floorSize = 200;
+    const tiles = 20;
+    const floorCanvas = document.createElement("canvas");
+    floorCanvas.width = floorCanvas.height = 512;
+    const ctx = floorCanvas.getContext("2d");
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) {
+        ctx.fillStyle = (x + y) % 2 === 0 ? "#ffffff" : "#999999";
+        ctx.fillRect(x * 64, y * 64, 64, 64);
+      }
+    }
+    const floorTexture = new THREE.CanvasTexture(floorCanvas);
+    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+    floorTexture.repeat.set(tiles, tiles);
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+      map: floorTexture, 
+      side: THREE.DoubleSide 
+    });
+    const floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(floorSize, floorSize), 
+      floorMaterial
+    );
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+    sunLight.position.set(50, 100, 50);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 500;
+    scene.add(sunLight);
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+
+      let moved = false;
+      if (keys["w"]) { player.position.z -= 0.05; moved = true; }
+      if (keys["s"]) { player.position.z += 0.05; moved = true; }
+      if (keys["a"]) { player.position.x -= 0.05; moved = true; }
+      if (keys["d"]) { player.position.x += 0.05; moved = true; }
+
+      if (moved) {
+        playerRef.update({ 
+          x: player.position.x, 
+          y: player.position.y, 
+          z: player.position.z 
+        });
+      }
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize handler
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
+
