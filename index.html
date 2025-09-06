@@ -5,111 +5,85 @@
   <title>Multiplayer Hats</title>
   <style>
     body { margin:0; overflow:hidden; }
-    #colorPicker { position:absolute; top:10px; right:10px; z-index:10; }
-    #floodBtn {
-      position:absolute;
-      bottom:20px; left:20px;
-      padding:10px 20px;
-      font-size:16px;
-      background:#c62828;
-      color:white;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-      z-index:10;
+    #colorPicker {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
     }
-    #hatMenu {
-      position:absolute;
-      top:50px; right:10px;
-      background:#222;
-      color:white;
-      padding:10px;
-      border-radius:8px;
-      z-index:10;
-    }
-    #hatMenu button {
-      display:block;
-      margin:5px 0;
-      padding:5px 10px;
-      background:#444;
-      border:none;
-      border-radius:6px;
-      cursor:pointer;
-      color:white;
-    }
-    #hatMenu button:hover { background:#666; }
   </style>
 </head>
 <body>
-  <input type="color" id="colorPicker" value="#888888" />
-  <button id="floodBtn">Flood Map</button>
+<input type="color" id="colorPicker" value="#888888" />
 
-  <!-- NEW hat selection -->
-  <div id="hatMenu">
-    <button data-hat="valkyrie">Valkyrie</button>
-    <button data-hat="topHat">Top Hat</button>
-    <button data-hat="hood">Viridian Hood</button>
-    <button data-hat="sunglasses">Sunglasses</button>
-    <button data-hat="">Remove Hat</button>
-  </div>
+<script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
-  <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+window.addEventListener("contextmenu", e => e.preventDefault());
 
-  <script>
-    window.addEventListener("contextmenu", e => e.preventDefault());
+// Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
+  authDomain: "pasja-data5100s.firebaseapp.com",
+  projectId: "pasja-data5100s",
+  storageBucket: "pasja-data5100s.firebasestorage.app",
+  messagingSenderId: "1042573635103",
+  appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
+  measurementId: "G-Z2GYGXQTMZ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    // Firebase setup
-    const firebaseConfig = {
-      apiKey: "AIzaSyC_Op87WdFH-xBlbyBPgH66LilwGZ8Ch5w",
-      authDomain: "pasja-data5100s.firebaseapp.com",
-      projectId: "pasja-data5100s",
-      storageBucket: "pasja-data5100s.firebasestorage.app",
-      messagingSenderId: "1042573635103",
-      appId: "1:1042573635103:web:9f70d20e5ac49f951b6f2a",
-      measurementId: "G-Z2GYGXQTMZ"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+// Scene
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-    // Three.js setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
+// Character model
+function createCharacter(color) {
+  const mat = new THREE.MeshStandardMaterial({ color });
+  const group = new THREE.Group();
 
-    // Character
-    function createCharacter(color) {
-      const mat = new THREE.MeshStandardMaterial({ color });
-      const group = new THREE.Group();
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
+  head.position.y = 3.25;
+  head.castShadow = true;
+  head.name = "head";
+  group.add(head);
 
-      const head = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,1.25), mat);
-      head.position.y = 3.25; head.castShadow = true; head.name = "head";
-      group.add(head);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
+  torso.position.y = 1.5;
+  torso.castShadow = true;
+  group.add(torso);
 
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(2,2,1), mat);
-      torso.position.y = 1.5; torso.castShadow = true; group.add(torso);
+  const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  leftArm.position.set(-1.5, 1.5, 0);
+  leftArm.castShadow = true;
+  group.add(leftArm);
 
-      const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-      leftArm.position.set(-1.5,1.5,0); leftArm.castShadow = true; group.add(leftArm);
+  const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  rightArm.position.set(1.5, 1.5, 0);
+  rightArm.castShadow = true;
+  group.add(rightArm);
 
-      const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-      rightArm.position.set(1.5,1.5,0); rightArm.castShadow = true; group.add(rightArm);
+  const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  leftLeg.position.set(-0.5, -0.5, 0);
+  leftLeg.castShadow = true;
+  group.add(leftLeg);
 
-      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-      leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow = true; group.add(leftLeg);
+  const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat);
+  rightLeg.position.set(0.5, -0.5, 0);
+  rightLeg.castShadow = true;
+  group.add(rightLeg);
 
-      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
-      rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow = true; group.add(rightLeg);
+  return group;
+}
 
-      return group;
-    }
-
-    // Hat models
-// Hat models (improved detail)
+// Detailed Hats
 function makeHat(type) {
   let hat;
   switch(type) {
@@ -122,7 +96,6 @@ function makeHat(type) {
       helm.position.y = 0.3;
       hat.add(helm);
 
-      // gem
       const gem = new THREE.Mesh(
         new THREE.OctahedronGeometry(0.2),
         new THREE.MeshStandardMaterial({ color:0x44aaff, emissive:0x2255ff })
@@ -130,14 +103,10 @@ function makeHat(type) {
       gem.position.set(0,0.35,0.8);
       hat.add(gem);
 
-      // wings
       const featherMat = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.8 });
       for (let side of [-1,1]) {
         for (let i=0;i<4;i++) {
-          const feather = new THREE.Mesh(
-            new THREE.BoxGeometry(0.1,0.5,0.15),
-            featherMat
-          );
+          const feather = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.5,0.15), featherMat);
           feather.position.set(side*0.9,0.5+i*0.4,-0.1*i);
           feather.rotation.z = side*0.2;
           hat.add(feather);
@@ -180,7 +149,6 @@ function makeHat(type) {
       outer.position.y = 0.4;
       hat.add(outer);
 
-      // rim
       const rim = new THREE.Mesh(
         new THREE.TorusGeometry(1,0.1,8,24,Math.PI),
         new THREE.MeshStandardMaterial({ color:0x007744 })
@@ -188,7 +156,6 @@ function makeHat(type) {
       rim.rotation.x = Math.PI/2;
       rim.position.y = 0.1;
       hat.add(rim);
-
       break;
 
     case "sunglasses":
@@ -204,12 +171,10 @@ function makeHat(type) {
       lens2.position.set(0.45,0,0.7);
       hat.add(lens1); hat.add(lens2);
 
-      // bridge
       const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.05), frameMat);
       bridge.position.set(0,0,0.7);
       hat.add(bridge);
 
-      // temples
       for (let side of [-1,1]) {
         const temple = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.6), frameMat);
         temple.position.set(side*0.65,0,0.4);
@@ -221,104 +186,153 @@ function makeHat(type) {
   return hat;
 }
 
+// Player + networking
+const player = createCharacter(0x888888);
+scene.add(player);
+const players = {};
+const playerId = Math.random().toString(36).substr(2, 9);
 
-    // Firebase refs
-    const playerRef = db.ref("players/"+playerId);
-    playerRef.set({ x:0,y:0,z:0,color:"#888888",hat:"" });
-    playerRef.onDisconnect().remove();
+// Camera controls
+let radius = 5, theta = 0, phi = Math.PI/4;
+let isDragging = false, lastX, lastY;
+function updateCamera() {
+  const target = player.position;
+  camera.position.x = target.x + radius * Math.sin(phi) * Math.cos(theta);
+  camera.position.y = target.y + radius * Math.cos(phi);
+  camera.position.z = target.z + radius * Math.sin(phi) * Math.sin(theta);
+  camera.lookAt(target);
+}
+updateCamera();
 
-    // Color picker
-    document.getElementById("colorPicker").addEventListener("input", e=>{
-      player.traverse(obj=>{ if(obj.isMesh) obj.material.color.set(e.target.value); });
-      playerRef.update({ color:e.target.value });
-    });
+window.addEventListener("mousedown", e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener("mouseup", () => isDragging = false);
+window.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+  let dx = e.clientX - lastX;
+  let dy = e.clientY - lastY;
+  theta -= dx * 0.01;
+  phi -= dy * 0.01;
+  phi = Math.max(0.1, Math.min(Math.PI-0.1, phi));
+  updateCamera();
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener("wheel", e => {
+  radius += e.deltaY*0.01;
+  radius = Math.max(2, Math.min(20, radius));
+  updateCamera();
+});
 
-    // Hat menu
-    document.querySelectorAll("#hatMenu button").forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const hat = btn.dataset.hat;
-        applyHat(player, hat);
-        playerRef.update({ hat });
-      });
-    });
+// Database reference
+const playerRef = db.ref("players/" + playerId);
+playerRef.set({ x:0, y:0, z:0, color:"#888888", hat:null });
+playerRef.onDisconnect().remove();
 
-    // Sync other players
-    db.ref("players").on("value", snap=>{
-      const data = snap.val()||{};
-      for(let id in data){
-        if(id===playerId) continue;
-        if(!players[id]){
-          const mesh=createCharacter(data[id].color);
-          scene.add(mesh);
-          players[id]=mesh;
-        }
-        players[id].traverse(obj=>{ if(obj.isMesh) obj.material.color.set(data[id].color); });
-        players[id].position.set(data[id].x,data[id].y,data[id].z);
-        applyHat(players[id], data[id].hat);
-      }
-      for(let id in players){
-        if(!data[id]){ scene.remove(players[id]); delete players[id]; }
-      }
-    });
+// Color picker
+document.getElementById("colorPicker").addEventListener("input", e => {
+  player.traverse(obj => { if (obj.isMesh) obj.material.color.set(e.target.value); });
+  playerRef.update({ color:e.target.value });
+});
 
-    // Movement + camera
-    const keys={};
-    window.addEventListener("keydown", e=>keys[e.key]=true);
-    window.addEventListener("keyup", e=>keys[e.key]=false);
-
-    let radius=5,theta=0,phi=Math.PI/4,isDragging=false,lastX,lastY;
-    function updateCamera(){
-      const target=player.position;
-      camera.position.x=target.x+radius*Math.sin(phi)*Math.cos(theta);
-      camera.position.y=target.y+radius*Math.cos(phi);
-      camera.position.z=target.z+radius*Math.sin(phi)*Math.sin(theta);
-      camera.lookAt(target);
+// Listen for other players
+db.ref("players").on("value", snapshot => {
+  const data = snapshot.val() || {};
+  for (let id in data) {
+    if (id===playerId) continue;
+    if (!players[id]) {
+      const mesh = createCharacter(data[id].color);
+      scene.add(mesh);
+      players[id] = { mesh, hat:null };
     }
-    updateCamera();
-    window.addEventListener("mousedown", e=>{isDragging=true;lastX=e.clientX;lastY=e.clientY;});
-    window.addEventListener("mouseup",()=>isDragging=false);
-    window.addEventListener("mousemove", e=>{
-      if(!isDragging) return;
-      let dx=e.clientX-lastX, dy=e.clientY-lastY;
-      theta-=dx*0.01; phi-=dy*0.01;
-      phi=Math.max(0.1,Math.min(Math.PI-0.1,phi));
-      updateCamera(); lastX=e.clientX; lastY=e.clientY;
-    });
-    window.addEventListener("wheel", e=>{
-      radius+=e.deltaY*0.01;
-      radius=Math.max(2,Math.min(20,radius));
-      updateCamera();
-    });
+    const p = players[id];
+    p.mesh.traverse(obj => { if (obj.isMesh) obj.material.color.set(data[id].color); });
+    p.mesh.position.set(data[id].x, data[id].y, data[id].z);
 
-    // Simple ground + light
-    const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),
-      new THREE.MeshStandardMaterial({color:0x888888,side:THREE.DoubleSide}));
-    floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
-
-    scene.add(new THREE.AmbientLight(0xffffff,0.6));
-    const sun=new THREE.DirectionalLight(0xffffff,1);
-    sun.position.set(50,100,50); sun.castShadow=true; scene.add(sun);
-
-    // Animate
-    function animate(){
-      requestAnimationFrame(animate);
-      let moved=false;
-      if(keys["w"]){player.position.z-=0.05;moved=true;}
-      if(keys["s"]){player.position.z+=0.05;moved=true;}
-      if(keys["a"]){player.position.x-=0.05;moved=true;}
-      if(keys["d"]){player.position.x+=0.05;moved=true;}
-      if(moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
-      updateCamera();
-      renderer.render(scene,camera);
+    // Update hat
+    if (p.hat) { p.mesh.getObjectByName("head").remove(p.hat); p.hat=null; }
+    if (data[id].hat) {
+      p.hat = makeHat(data[id].hat);
+      if (p.hat) {
+        p.hat.position.y = 0.9;
+        p.mesh.getObjectByName("head").add(p.hat);
+      }
     }
-    animate();
+  }
+  for (let id in players) {
+    if (!data[id]) {
+      scene.remove(players[id].mesh);
+      delete players[id];
+    }
+  }
+});
 
-    window.addEventListener("resize",()=>{
-      camera.aspect=window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth,window.innerHeight);
-    });
-  </script>
+// Movement
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key]=true);
+window.addEventListener("keyup", e => keys[e.key]=false);
+
+// Equip hats (1-4, 0 to remove)
+window.addEventListener("keydown", e => {
+  if (e.key==="1") playerRef.update({ hat:"valkyrie" });
+  if (e.key==="2") playerRef.update({ hat:"topHat" });
+  if (e.key==="3") playerRef.update({ hat:"hood" });
+  if (e.key==="4") playerRef.update({ hat:"sunglasses" });
+  if (e.key==="0") playerRef.update({ hat:null });
+});
+
+// Floor
+const floorSize = 200, tiles = 20;
+const floorCanvas = document.createElement("canvas");
+floorCanvas.width = floorCanvas.height = 512;
+const ctx = floorCanvas.getContext("2d");
+for (let y=0;y<8;y++){
+  for(let x=0;x<8;x++){
+    ctx.fillStyle = (x+y)%2===0 ? "#ffffff" : "#999999";
+    ctx.fillRect(x*64,y*64,64,64);
+  }
+}
+const floorTexture = new THREE.CanvasTexture(floorCanvas);
+floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+floorTexture.repeat.set(tiles, tiles);
+const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture, side: THREE.DoubleSide });
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMaterial);
+floorMesh.rotation.x = -Math.PI/2;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff,0.6);
+scene.add(ambientLight);
+const sunLight = new THREE.DirectionalLight(0xffffff,1);
+sunLight.position.set(50,100,50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width=2048;
+sunLight.shadow.mapSize.height=2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 500;
+scene.add(sunLight);
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  let moved=false;
+  if (keys["w"]){player.position.z-=0.05;moved=true;}
+  if (keys["s"]){player.position.z+=0.05;moved=true;}
+  if (keys["a"]){player.position.x-=0.05;moved=true;}
+  if (keys["d"]){player.position.x+=0.05;moved=true;}
+  if (moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
+  updateCamera();
+  renderer.render(scene,camera);
+}
+animate();
+
+// Resize
+window.addEventListener("resize",()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
 </body>
 </html>
+
 
