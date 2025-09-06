@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Cubes</title>
+  <title>Multiplayer Hats</title>
   <style>
     body { margin:0; overflow:hidden; }
     #colorPicker { position:absolute; top:10px; right:10px; z-index:10; }
@@ -18,13 +18,40 @@
       cursor:pointer;
       z-index:10;
     }
-    #floodBtn:active { background:#8e0000; }
+    #hatMenu {
+      position:absolute;
+      top:50px; right:10px;
+      background:#222;
+      color:white;
+      padding:10px;
+      border-radius:8px;
+      z-index:10;
+    }
+    #hatMenu button {
+      display:block;
+      margin:5px 0;
+      padding:5px 10px;
+      background:#444;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      color:white;
+    }
+    #hatMenu button:hover { background:#666; }
   </style>
 </head>
 <body>
   <input type="color" id="colorPicker" value="#888888" />
-  <!-- NEW flood button -->
   <button id="floodBtn">Flood Map</button>
+
+  <!-- NEW hat selection -->
+  <div id="hatMenu">
+    <button data-hat="valkyrie">Valkyrie</button>
+    <button data-hat="topHat">Top Hat</button>
+    <button data-hat="hood">Viridian Hood</button>
+    <button data-hat="sunglasses">Sunglasses</button>
+    <button data-hat="">Remove Hat</button>
+  </div>
 
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -49,58 +76,165 @@
     // Three.js setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-
     const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // Character model
+    // Character
     function createCharacter(color) {
       const mat = new THREE.MeshStandardMaterial({ color });
       const group = new THREE.Group();
+
       const head = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,1.25), mat);
-      head.position.y = 3.25; head.castShadow = true; group.add(head);
+      head.position.y = 3.25; head.castShadow = true; head.name = "head";
+      group.add(head);
+
       const torso = new THREE.Mesh(new THREE.BoxGeometry(2,2,1), mat);
       torso.position.y = 1.5; torso.castShadow = true; group.add(torso);
+
       const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       leftArm.position.set(-1.5,1.5,0); leftArm.castShadow = true; group.add(leftArm);
+
       const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       rightArm.position.set(1.5,1.5,0); rightArm.castShadow = true; group.add(rightArm);
+
       const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow = true; group.add(leftLeg);
+
       const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow = true; group.add(rightLeg);
+
       return group;
+    }
+
+    // Hat models
+    function makeHat(type) {
+      let hat;
+      switch(type) {
+        case "valkyrie":
+          hat = new THREE.Group();
+          const helm = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.6,1.3), new THREE.MeshStandardMaterial({ color:0x8888ff }));
+          helm.position.y = 0.4;
+          hat.add(helm);
+          const wing1 = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.6,1), new THREE.MeshStandardMaterial({ color:0xffffff }));
+          wing1.position.set(-0.8,0.5,0);
+          hat.add(wing1);
+          const wing2 = wing1.clone(); wing2.position.x = 0.8; hat.add(wing2);
+          break;
+        case "topHat":
+          hat = new THREE.Group();
+          const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.2,16), new THREE.MeshStandardMaterial({ color:0x000000 }));
+          brim.position.y = 0;
+          const tall = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.2,16), new THREE.MeshStandardMaterial({ color:0x000000 }));
+          tall.position.y = 0.7;
+          hat.add(brim); hat.add(tall);
+          break;
+        case "hood":
+          hat = new THREE.Mesh(new THREE.SphereGeometry(0.9,16,16,0,Math.PI*2,0,Math.PI/2), 
+            new THREE.MeshStandardMaterial({ color:0x00aa66, side:THREE.DoubleSide }));
+          hat.position.y = 0.2;
+          break;
+        case "sunglasses":
+          hat = new THREE.Group();
+          const glassMat = new THREE.MeshStandardMaterial({ color:0x111111 });
+          const lens1 = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.05), glassMat);
+          const lens2 = lens1.clone();
+          lens1.position.set(-0.35,0,0.65);
+          lens2.position.set(0.35,0,0.65);
+          hat.add(lens1); hat.add(lens2);
+          const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.05,0.05), glassMat);
+          bridge.position.set(0,0,0.65);
+          hat.add(bridge);
+          break;
+      }
+      if(hat) hat.name = "hat";
+      return hat;
     }
 
     const player = createCharacter(0x888888);
     scene.add(player);
-
     const players = {};
-    const playerId = Math.random().toString(36).substr(2, 9);
+    const playerId = Math.random().toString(36).substr(2,9);
 
-    // Camera controls
-    let radius = 5, theta = 0, phi = Math.PI/4;
-    let isDragging=false, lastX, lastY;
-    function updateCamera() {
-      const target = player.position;
-      camera.position.x = target.x + radius*Math.sin(phi)*Math.cos(theta);
-      camera.position.y = target.y + radius*Math.cos(phi);
-      camera.position.z = target.z + radius*Math.sin(phi)*Math.sin(theta);
+    // Helpers to manage hats
+    function applyHat(character, hatName) {
+      // remove old hat
+      const old = character.getObjectByName("hat");
+      if(old) old.parent.remove(old);
+
+      if(!hatName) return;
+      const head = character.getObjectByName("head");
+      if(!head) return;
+
+      const newHat = makeHat(hatName);
+      if(newHat) {
+        head.add(newHat);
+        newHat.position.y = 0.8; // sit above head
+      }
+    }
+
+    // Firebase refs
+    const playerRef = db.ref("players/"+playerId);
+    playerRef.set({ x:0,y:0,z:0,color:"#888888",hat:"" });
+    playerRef.onDisconnect().remove();
+
+    // Color picker
+    document.getElementById("colorPicker").addEventListener("input", e=>{
+      player.traverse(obj=>{ if(obj.isMesh) obj.material.color.set(e.target.value); });
+      playerRef.update({ color:e.target.value });
+    });
+
+    // Hat menu
+    document.querySelectorAll("#hatMenu button").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const hat = btn.dataset.hat;
+        applyHat(player, hat);
+        playerRef.update({ hat });
+      });
+    });
+
+    // Sync other players
+    db.ref("players").on("value", snap=>{
+      const data = snap.val()||{};
+      for(let id in data){
+        if(id===playerId) continue;
+        if(!players[id]){
+          const mesh=createCharacter(data[id].color);
+          scene.add(mesh);
+          players[id]=mesh;
+        }
+        players[id].traverse(obj=>{ if(obj.isMesh) obj.material.color.set(data[id].color); });
+        players[id].position.set(data[id].x,data[id].y,data[id].z);
+        applyHat(players[id], data[id].hat);
+      }
+      for(let id in players){
+        if(!data[id]){ scene.remove(players[id]); delete players[id]; }
+      }
+    });
+
+    // Movement + camera
+    const keys={};
+    window.addEventListener("keydown", e=>keys[e.key]=true);
+    window.addEventListener("keyup", e=>keys[e.key]=false);
+
+    let radius=5,theta=0,phi=Math.PI/4,isDragging=false,lastX,lastY;
+    function updateCamera(){
+      const target=player.position;
+      camera.position.x=target.x+radius*Math.sin(phi)*Math.cos(theta);
+      camera.position.y=target.y+radius*Math.cos(phi);
+      camera.position.z=target.z+radius*Math.sin(phi)*Math.sin(theta);
       camera.lookAt(target);
     }
     updateCamera();
-
     window.addEventListener("mousedown", e=>{isDragging=true;lastX=e.clientX;lastY=e.clientY;});
-    window.addEventListener("mouseup", ()=>isDragging=false);
+    window.addEventListener("mouseup",()=>isDragging=false);
     window.addEventListener("mousemove", e=>{
       if(!isDragging) return;
       let dx=e.clientX-lastX, dy=e.clientY-lastY;
       theta-=dx*0.01; phi-=dy*0.01;
       phi=Math.max(0.1,Math.min(Math.PI-0.1,phi));
-      updateCamera();
-      lastX=e.clientX; lastY=e.clientY;
+      updateCamera(); lastX=e.clientX; lastY=e.clientY;
     });
     window.addEventListener("wheel", e=>{
       radius+=e.deltaY*0.01;
@@ -108,120 +242,29 @@
       updateCamera();
     });
 
-    // Firebase player sync
-    const playerRef = db.ref("players/"+playerId);
-    playerRef.set({ x:0,y:0,z:0,color:"#888888" });
-    playerRef.onDisconnect().remove();
+    // Simple ground + light
+    const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),
+      new THREE.MeshStandardMaterial({color:0x888888,side:THREE.DoubleSide}));
+    floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
 
-    document.getElementById("colorPicker").addEventListener("input", e=>{
-      player.traverse(obj=>{ if(obj.isMesh) obj.material.color.set(e.target.value); });
-      playerRef.update({ color:e.target.value });
-    });
-
-    db.ref("players").on("value", snap=>{
-      const data = snap.val()||{};
-      for(let id in data){
-        if(id===playerId) continue;
-        if(!players[id]){
-          const mesh=createCharacter(data[id].color);
-          mesh.castShadow=true;
-          scene.add(mesh);
-          players[id]=mesh;
-        }
-        players[id].traverse(obj=>{ if(obj.isMesh) obj.material.color.set(data[id].color); });
-        players[id].position.set(data[id].x,data[id].y,data[id].z);
-      }
-      for(let id in players){
-        if(!data[id]){ scene.remove(players[id]); delete players[id]; }
-      }
-    });
-
-    // Movement
-    const keys={};
-    window.addEventListener("keydown", e=>keys[e.key]=true);
-    window.addEventListener("keyup", e=>keys[e.key]=false);
-
-    // Floor
-    const floorSize=200, tiles=20;
-    const floorCanvas=document.createElement("canvas");
-    floorCanvas.width=floorCanvas.height=512;
-    const ctx=floorCanvas.getContext("2d");
-    for(let y=0;y<8;y++){for(let x=0;x<8;x++){
-      ctx.fillStyle=(x+y)%2===0?"#ffffff":"#999999";
-      ctx.fillRect(x*64,y*64,64,64);
-    }}
-    const floorTexture=new THREE.CanvasTexture(floorCanvas);
-    floorTexture.wrapS=floorTexture.wrapT=THREE.RepeatWrapping;
-    floorTexture.repeat.set(tiles,tiles);
-    const floorMaterial=new THREE.MeshStandardMaterial({map:floorTexture,side:THREE.DoubleSide});
-    const floorMesh=new THREE.Mesh(new THREE.PlaneGeometry(floorSize,floorSize),floorMaterial);
-    floorMesh.rotation.x=-Math.PI/2; floorMesh.receiveShadow=true;
-    scene.add(floorMesh);
-
-    // Lighting
     scene.add(new THREE.AmbientLight(0xffffff,0.6));
-    const sunLight=new THREE.DirectionalLight(0xffffff,1);
-    sunLight.position.set(50,100,50);
-    sunLight.castShadow=true;
-    sunLight.shadow.mapSize.width=sunLight.shadow.mapSize.height=2048;
-    sunLight.shadow.camera.near=0.5; sunLight.shadow.camera.far=500;
-    scene.add(sunLight);
+    const sun=new THREE.DirectionalLight(0xffffff,1);
+    sun.position.set(50,100,50); sun.castShadow=true; scene.add(sun);
 
-    // --- NEW Flood system ---
-    const waterGeo = new THREE.PlaneGeometry(floorSize, floorSize);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x3399ff,
-      transparent: true,
-      opacity: 0.6,
-      side: THREE.DoubleSide
-    });
-    const water = new THREE.Mesh(waterGeo, waterMat);
-    water.rotation.x = -Math.PI/2;
-    water.position.y = -10; // hidden below floor initially
-    scene.add(water);
-
-    let floodActive = false;
-    let floodStart = 0;
-
-    // Listen for flood state from server (Firebase)
-    db.ref("flood").on("value", snap=>{
-      floodActive = snap.val()===true;
-      if(floodActive) floodStart = performance.now();
-    });
-
-    // Button triggers flood for 8 seconds
-    document.getElementById("floodBtn").addEventListener("click", ()=>{
-      db.ref("flood").set(true);
-      setTimeout(()=>db.ref("flood").set(false), 8000);
-    });
-
-    // Animation loop
-    function animate() {
+    // Animate
+    function animate(){
       requestAnimationFrame(animate);
-
       let moved=false;
       if(keys["w"]){player.position.z-=0.05;moved=true;}
       if(keys["s"]){player.position.z+=0.05;moved=true;}
       if(keys["a"]){player.position.x-=0.05;moved=true;}
       if(keys["d"]){player.position.x+=0.05;moved=true;}
       if(moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
-
-      // Animate flood rising and falling
-      if(floodActive){
-        const t = (performance.now()-floodStart)/8000; // 0 → 1
-        if(t<1){
-          water.position.y = Math.sin(t*Math.PI)*5; // rises then falls
-        }
-      } else {
-        water.position.y = -10;
-      }
-
       updateCamera();
       renderer.render(scene,camera);
     }
     animate();
 
-    // Resize
     window.addEventListener("resize",()=>{
       camera.aspect=window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
@@ -230,3 +273,4 @@
   </script>
 </body>
 </html>
+
