@@ -2,29 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Cubes with Hats</title>
+  <title>Multiplayer Cubes with OBJ Hat</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    #colorPicker, #hatSelect { 
+    #colorPicker { 
       position: absolute; 
       top: 10px; 
       right: 10px; 
       z-index: 10; 
-      margin-left: 10px;
     }
-    #hatSelect { right: 150px; }
   </style>
 </head>
 <body>
   <input type="color" id="colorPicker" value="#888888" />
-  <select id="hatSelect">
-    <option value="">None</option>
-    <option value="antlers">Antlers</option>
-    <option value="hood">Hood</option>
-  </select>
 
+  <!-- Three.js -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://unpkg.com/three@0.149.0/examples/js/loaders/OBJLoader.js"></script>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
@@ -52,15 +48,7 @@
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // GLTF loader
-    const loader = new THREE.GLTFLoader();
-
-    // Hat URLs
-    const hatURLs = {
-      antlers: "https://files.catbox.moe/j1tcat.glb",
-      hood: "https://files.catbox.moe/6ysvsg.glb"
-    };
-
+    // Create character
     function createCharacter(color) {
       const mat = new THREE.MeshStandardMaterial({ color });
       const group = new THREE.Group();
@@ -68,7 +56,6 @@
       const head = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 1.25), mat);
       head.position.y = 3.25;
       head.castShadow = true;
-      head.name = "head";
       group.add(head);
 
       const torso = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), mat);
@@ -96,12 +83,23 @@
       rightLeg.castShadow = true;
       group.add(rightLeg);
 
-      group.userData.hat = null; // current hat
       return group;
     }
 
     const player = createCharacter(0x888888);
     scene.add(player);
+
+    // Add OBJ hat to player
+    const objLoader = new THREE.OBJLoader();
+    // Replace the URL with your own OBJ file (Antlers or Hood)
+    objLoader.load("https://files.catbox.moe/nfyfl3.obj", obj => {
+      obj.traverse(child => {
+        if (child.isMesh) child.material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+      });
+      obj.scale.set(0.5,0.5,0.5); // adjust scale
+      obj.position.y = 4.2;       // position on top of head
+      player.add(obj);
+    });
 
     const players = {};
     const playerId = Math.random().toString(36).substr(2, 9);
@@ -129,7 +127,8 @@
       phi -= dy * 0.01;
       phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
       updateCamera();
-      lastX = e.clientX; lastY = e.clientY;
+      lastX = e.clientX;
+      lastY = e.clientY;
     });
     window.addEventListener("wheel", e => {
       radius += e.deltaY * 0.01;
@@ -139,38 +138,14 @@
 
     // Firebase player sync
     const playerRef = db.ref("players/" + playerId);
-    playerRef.set({ x: 0, y: 0, z: 0, color: "#888888", hat: "" });
+    playerRef.set({ x: 0, y: 0, z: 0, color: "#888888" });
     playerRef.onDisconnect().remove();
 
-    // Color picker
     document.getElementById("colorPicker").addEventListener("input", e => {
       player.traverse(obj => { if (obj.isMesh) obj.material.color.set(e.target.value); });
       playerRef.update({ color: e.target.value });
     });
 
-    // Hat selector
-    document.getElementById("hatSelect").addEventListener("change", e => {
-      const hatName = e.target.value;
-      setHat(player, hatName);
-      playerRef.update({ hat: hatName });
-    });
-
-    function setHat(character, hatName) {
-      // Remove old hat
-      if (character.userData.hat) character.remove(character.userData.hat);
-      if (!hatName) { character.userData.hat = null; return; }
-
-      loader.load(hatURLs[hatName], gltf => {
-        const hat = gltf.scene;
-        hat.scale.set(1.2, 1.2, 1.2);
-        hat.position.set(0, 3.8, 0); // adjust relative to head
-        hat.name = "hat";
-        character.add(hat);
-        character.userData.hat = hat;
-      });
-    }
-
-    // Update other players
     db.ref("players").on("value", snapshot => {
       const data = snapshot.val() || {};
       for (let id in data) {
@@ -183,12 +158,12 @@
         }
         players[id].traverse(obj => { if (obj.isMesh) obj.material.color.set(data[id].color); });
         players[id].position.set(data[id].x, data[id].y, data[id].z);
-
-        // Handle hats
-        setHat(players[id], data[id].hat);
       }
       for (let id in players) {
-        if (!data[id]) { scene.remove(players[id]); delete players[id]; }
+        if (!data[id]) {
+          scene.remove(players[id]);
+          delete players[id];
+        }
       }
     });
 
@@ -197,33 +172,38 @@
     window.addEventListener("keydown", e => keys[e.key] = true);
     window.addEventListener("keyup", e => keys[e.key] = false);
 
-    // Checkered floor
-    const floorSize = 200;
-    const tiles = 20;
+    // Floor
+    const floorSize = 200, tiles = 20;
     const floorCanvas = document.createElement("canvas");
     floorCanvas.width = floorCanvas.height = 512;
     const ctx = floorCanvas.getContext("2d");
-    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { ctx.fillStyle = (x + y) % 2 === 0 ? "#ffffff" : "#999999"; ctx.fillRect(x * 64, y * 64, 64, 64); }
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) {
+        ctx.fillStyle = (x + y) % 2 === 0 ? "#ffffff" : "#999999";
+        ctx.fillRect(x*64, y*64, 64, 64);
+      }
+    }
     const floorTexture = new THREE.CanvasTexture(floorCanvas);
     floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
     floorTexture.repeat.set(tiles, tiles);
     const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture, side: THREE.DoubleSide });
     const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMaterial);
-    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.rotation.x = -Math.PI/2;
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
-    // Lighting
+    // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const sunLight = new THREE.DirectionalLight(0xffffff, 1);
     sunLight.position.set(50, 100, 50);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 500;
     scene.add(sunLight);
 
-    // Animation loop
+    // Animate
     function animate() {
       requestAnimationFrame(animate);
       let moved = false;
@@ -231,16 +211,19 @@
       if (keys["s"]) { player.position.z += 0.05; moved = true; }
       if (keys["a"]) { player.position.x -= 0.05; moved = true; }
       if (keys["d"]) { player.position.x += 0.05; moved = true; }
-      if (moved) playerRef.update({ x: player.position.x, y: player.position.y, z: player.position.z });
+      if (moved) {
+        playerRef.update({ x: player.position.x, y: player.position.y, z: player.position.z });
+      }
       updateCamera();
       renderer.render(scene, camera);
     }
     animate();
 
-    // Resize
-    window.addEventListener("resize", () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
 </body>
 </html>
-
-
