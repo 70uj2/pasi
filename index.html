@@ -27,8 +27,6 @@
 
   <!-- Three.js -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <!-- RoundedBoxGeometry helper -->
-  <script src="https://unpkg.com/three@0.149.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -58,29 +56,53 @@
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
+    // --- Beveled Box Geometry Helper ---
+    function createBeveledBox(w, h, d, bevel = 0.2) {
+      const shape = new THREE.Shape();
+      const hw = w / 2 - bevel;
+      const hh = h / 2 - bevel;
+
+      shape.moveTo(-hw, -hh);
+      shape.lineTo(hw, -hh);
+      shape.lineTo(hw, hh);
+      shape.lineTo(-hw, hh);
+      shape.lineTo(-hw, -hh);
+
+      const extrudeSettings = {
+        depth: d,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 1
+      };
+
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geo.center(); // make sure pivot is in the middle
+      return geo;
+    }
+
     // Character model with beveled edges
     function createCharacter(color) {
       const mat = new THREE.MeshStandardMaterial({ color });
       const group = new THREE.Group();
-      const bevel = 0.2;
-      const smooth = 4;
+      const b = 0.15; // bevel size
 
-      const head = new THREE.Mesh(new THREE.RoundedBoxGeometry(1.25,1.25,1.25, bevel, smooth), mat);
+      const head = new THREE.Mesh(createBeveledBox(1.25,1.25,1.25,b), mat);
       head.position.y = 3.25; head.castShadow = true; group.add(head);
 
-      const torso = new THREE.Mesh(new THREE.RoundedBoxGeometry(2,2,1, bevel, smooth), mat);
+      const torso = new THREE.Mesh(createBeveledBox(2,2,1,b), mat);
       torso.position.y = 1.5; torso.castShadow = true; group.add(torso);
 
-      const leftArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
+      const leftArm = new THREE.Mesh(createBeveledBox(1,2,1,b), mat);
       leftArm.position.set(-1.5,1.5,0); leftArm.castShadow = true; group.add(leftArm);
 
-      const rightArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
+      const rightArm = new THREE.Mesh(createBeveledBox(1,2,1,b), mat);
       rightArm.position.set(1.5,1.5,0); rightArm.castShadow = true; group.add(rightArm);
 
-      const leftLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
+      const leftLeg = new THREE.Mesh(createBeveledBox(1,2,1,b), mat);
       leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow = true; group.add(leftLeg);
 
-      const rightLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
+      const rightLeg = new THREE.Mesh(createBeveledBox(1,2,1,b), mat);
       rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow = true; group.add(rightLeg);
 
       return group;
