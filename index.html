@@ -2,21 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Cubes with OBJ Hat</title>
+  <title>Multiplayer Cubes</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    #colorPicker { position: absolute; top: 10px; right: 10px; z-index: 10; }
+    body { margin:0; overflow:hidden; }
+    #colorPicker { position:absolute; top:10px; right:10px; z-index:10; }
+    #floodBtn {
+      position:absolute;
+      bottom:20px; left:20px;
+      padding:10px 20px;
+      font-size:16px;
+      background:#c62828;
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      z-index:10;
+    }
+    #floodBtn:active { background:#8e0000; }
   </style>
 </head>
 <body>
   <input type="color" id="colorPicker" value="#888888" />
+  <!-- NEW flood button -->
+  <button id="floodBtn">Flood Map</button>
 
-  <!-- Three.js core -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-  <!-- OBJLoader non-module version -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/OBJLoader.js"></script>
-
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
@@ -39,56 +49,40 @@
     // Three.js setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // Create character
+    // Character model
     function createCharacter(color) {
       const mat = new THREE.MeshStandardMaterial({ color });
       const group = new THREE.Group();
-
       const head = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,1.25), mat);
       head.position.y = 3.25; head.castShadow = true; group.add(head);
-
       const torso = new THREE.Mesh(new THREE.BoxGeometry(2,2,1), mat);
       torso.position.y = 1.5; torso.castShadow = true; group.add(torso);
-
       const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       leftArm.position.set(-1.5,1.5,0); leftArm.castShadow = true; group.add(leftArm);
-
       const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       rightArm.position.set(1.5,1.5,0); rightArm.castShadow = true; group.add(rightArm);
-
       const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow = true; group.add(leftLeg);
-
       const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
       rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow = true; group.add(rightLeg);
-
       return group;
     }
 
     const player = createCharacter(0x888888);
     scene.add(player);
 
-    // Add OBJ hat
-    const loader = new THREE.OBJLoader();
-    loader.load('https://files.catbox.moe/j1tcat.obj', obj => {
-      obj.traverse(child => {
-        if(child.isMesh) child.material = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
-      });
-      obj.scale.set(0.5,0.5,0.5);
-      obj.position.y = 4.2;
-      player.add(obj);
-    });
-
     const players = {};
-    const playerId = Math.random().toString(36).substr(2,9);
+    const playerId = Math.random().toString(36).substr(2, 9);
 
     // Camera controls
-    let radius=5, theta=0, phi=Math.PI/4, isDragging=false, lastX, lastY;
+    let radius = 5, theta = 0, phi = Math.PI/4;
+    let isDragging=false, lastX, lastY;
     function updateCamera() {
       const target = player.position;
       camera.position.x = target.x + radius*Math.sin(phi)*Math.cos(theta);
@@ -97,32 +91,41 @@
       camera.lookAt(target);
     }
     updateCamera();
-    window.addEventListener("mousedown", e => { isDragging=true; lastX=e.clientX; lastY=e.clientY; });
+
+    window.addEventListener("mousedown", e=>{isDragging=true;lastX=e.clientX;lastY=e.clientY;});
     window.addEventListener("mouseup", ()=>isDragging=false);
-    window.addEventListener("mousemove", e => {
+    window.addEventListener("mousemove", e=>{
       if(!isDragging) return;
-      const dx=e.clientX-lastX, dy=e.clientY-lastY;
+      let dx=e.clientX-lastX, dy=e.clientY-lastY;
       theta-=dx*0.01; phi-=dy*0.01;
       phi=Math.max(0.1,Math.min(Math.PI-0.1,phi));
-      updateCamera(); lastX=e.clientX; lastY=e.clientY;
+      updateCamera();
+      lastX=e.clientX; lastY=e.clientY;
     });
-    window.addEventListener("wheel", e=>{ radius+=e.deltaY*0.01; radius=Math.max(2,Math.min(20,radius)); updateCamera(); });
+    window.addEventListener("wheel", e=>{
+      radius+=e.deltaY*0.01;
+      radius=Math.max(2,Math.min(20,radius));
+      updateCamera();
+    });
 
     // Firebase player sync
     const playerRef = db.ref("players/"+playerId);
     playerRef.set({ x:0,y:0,z:0,color:"#888888" });
     playerRef.onDisconnect().remove();
+
     document.getElementById("colorPicker").addEventListener("input", e=>{
       player.traverse(obj=>{ if(obj.isMesh) obj.material.color.set(e.target.value); });
-      playerRef.update({ color: e.target.value });
+      playerRef.update({ color:e.target.value });
     });
-    db.ref("players").on("value", snapshot=>{
-      const data = snapshot.val()||{};
+
+    db.ref("players").on("value", snap=>{
+      const data = snap.val()||{};
       for(let id in data){
         if(id===playerId) continue;
         if(!players[id]){
           const mesh=createCharacter(data[id].color);
-          mesh.castShadow=true; scene.add(mesh);
+          mesh.castShadow=true;
+          scene.add(mesh);
           players[id]=mesh;
         }
         players[id].traverse(obj=>{ if(obj.isMesh) obj.material.color.set(data[id].color); });
@@ -143,39 +146,83 @@
     const floorCanvas=document.createElement("canvas");
     floorCanvas.width=floorCanvas.height=512;
     const ctx=floorCanvas.getContext("2d");
-    for(let y=0;y<8;y++) for(let x=0;x<8;x++){
+    for(let y=0;y<8;y++){for(let x=0;x<8;x++){
       ctx.fillStyle=(x+y)%2===0?"#ffffff":"#999999";
       ctx.fillRect(x*64,y*64,64,64);
-    }
+    }}
     const floorTexture=new THREE.CanvasTexture(floorCanvas);
     floorTexture.wrapS=floorTexture.wrapT=THREE.RepeatWrapping;
     floorTexture.repeat.set(tiles,tiles);
-    const floorMaterial=new THREE.MeshStandardMaterial({ map: floorTexture, side: THREE.DoubleSide });
+    const floorMaterial=new THREE.MeshStandardMaterial({map:floorTexture,side:THREE.DoubleSide});
     const floorMesh=new THREE.Mesh(new THREE.PlaneGeometry(floorSize,floorSize),floorMaterial);
-    floorMesh.rotation.x=-Math.PI/2; floorMesh.receiveShadow=true; scene.add(floorMesh);
+    floorMesh.rotation.x=-Math.PI/2; floorMesh.receiveShadow=true;
+    scene.add(floorMesh);
 
-    // Lights
+    // Lighting
     scene.add(new THREE.AmbientLight(0xffffff,0.6));
     const sunLight=new THREE.DirectionalLight(0xffffff,1);
-    sunLight.position.set(50,100,50); sunLight.castShadow=true;
-    sunLight.shadow.mapSize.width=2048; sunLight.shadow.mapSize.height=2048;
+    sunLight.position.set(50,100,50);
+    sunLight.castShadow=true;
+    sunLight.shadow.mapSize.width=sunLight.shadow.mapSize.height=2048;
     sunLight.shadow.camera.near=0.5; sunLight.shadow.camera.far=500;
     scene.add(sunLight);
 
-    // Animate
-    function animate(){
+    // --- NEW Flood system ---
+    const waterGeo = new THREE.PlaneGeometry(floorSize, floorSize);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x3399ff,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI/2;
+    water.position.y = -10; // hidden below floor initially
+    scene.add(water);
+
+    let floodActive = false;
+    let floodStart = 0;
+
+    // Listen for flood state from server (Firebase)
+    db.ref("flood").on("value", snap=>{
+      floodActive = snap.val()===true;
+      if(floodActive) floodStart = performance.now();
+    });
+
+    // Button triggers flood for 8 seconds
+    document.getElementById("floodBtn").addEventListener("click", ()=>{
+      db.ref("flood").set(true);
+      setTimeout(()=>db.ref("flood").set(false), 8000);
+    });
+
+    // Animation loop
+    function animate() {
       requestAnimationFrame(animate);
+
       let moved=false;
-      if(keys["w"]){ player.position.z-=0.05; moved=true; }
-      if(keys["s"]){ player.position.z+=0.05; moved=true; }
-      if(keys["a"]){ player.position.x-=0.05; moved=true; }
-      if(keys["d"]){ player.position.x+=0.05; moved=true; }
-      if(moved) playerRef.update({ x:player.position.x, y:player.position.y, z:player.position.z });
-      updateCamera(); renderer.render(scene,camera);
+      if(keys["w"]){player.position.z-=0.05;moved=true;}
+      if(keys["s"]){player.position.z+=0.05;moved=true;}
+      if(keys["a"]){player.position.x-=0.05;moved=true;}
+      if(keys["d"]){player.position.x+=0.05;moved=true;}
+      if(moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
+
+      // Animate flood rising and falling
+      if(floodActive){
+        const t = (performance.now()-floodStart)/8000; // 0 → 1
+        if(t<1){
+          water.position.y = Math.sin(t*Math.PI)*5; // rises then falls
+        }
+      } else {
+        water.position.y = -10;
+      }
+
+      updateCamera();
+      renderer.render(scene,camera);
     }
     animate();
 
-    window.addEventListener("resize", ()=>{
+    // Resize
+    window.addEventListener("resize",()=>{
       camera.aspect=window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth,window.innerHeight);
