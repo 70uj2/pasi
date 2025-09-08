@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Cubes</title>
+  <title>Multiplayer Cubes (Beveled)</title>
   <style>
     body { margin:0; overflow:hidden; }
     #colorPicker { position:absolute; top:10px; right:10px; z-index:10; }
@@ -23,10 +23,13 @@
 </head>
 <body>
   <input type="color" id="colorPicker" value="#888888" />
-  <!-- NEW flood button -->
   <button id="floodBtn">Flood Map</button>
 
+  <!-- Three.js -->
   <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <!-- RoundedBoxGeometry helper -->
+  <script src="https://unpkg.com/three@0.149.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
@@ -55,22 +58,31 @@
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    // Character model
+    // Character model with beveled edges
     function createCharacter(color) {
       const mat = new THREE.MeshStandardMaterial({ color });
       const group = new THREE.Group();
-      const head = new THREE.Mesh(new THREE.BoxGeometry(1.25,1.25,1.25), mat);
+      const bevel = 0.2;
+      const smooth = 4;
+
+      const head = new THREE.Mesh(new THREE.RoundedBoxGeometry(1.25,1.25,1.25, bevel, smooth), mat);
       head.position.y = 3.25; head.castShadow = true; group.add(head);
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(2,2,1), mat);
+
+      const torso = new THREE.Mesh(new THREE.RoundedBoxGeometry(2,2,1, bevel, smooth), mat);
       torso.position.y = 1.5; torso.castShadow = true; group.add(torso);
-      const leftArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
+
+      const leftArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
       leftArm.position.set(-1.5,1.5,0); leftArm.castShadow = true; group.add(leftArm);
-      const rightArm = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
+
+      const rightArm = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
       rightArm.position.set(1.5,1.5,0); rightArm.castShadow = true; group.add(rightArm);
-      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
+
+      const leftLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
       leftLeg.position.set(-0.5,-0.5,0); leftLeg.castShadow = true; group.add(leftLeg);
-      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), mat);
+
+      const rightLeg = new THREE.Mesh(new THREE.RoundedBoxGeometry(1,2,1, bevel, smooth), mat);
       rightLeg.position.set(0.5,-0.5,0); rightLeg.castShadow = true; group.add(rightLeg);
+
       return group;
     }
 
@@ -167,7 +179,7 @@
     sunLight.shadow.camera.near=0.5; sunLight.shadow.camera.far=500;
     scene.add(sunLight);
 
-    // --- NEW Flood system ---
+    // Flood system
     const waterGeo = new THREE.PlaneGeometry(floorSize, floorSize);
     const waterMat = new THREE.MeshStandardMaterial({
       color: 0x3399ff,
@@ -177,19 +189,17 @@
     });
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.rotation.x = -Math.PI/2;
-    water.position.y = -10; // hidden below floor initially
+    water.position.y = -10;
     scene.add(water);
 
     let floodActive = false;
     let floodStart = 0;
 
-    // Listen for flood state from server (Firebase)
     db.ref("flood").on("value", snap=>{
       floodActive = snap.val()===true;
       if(floodActive) floodStart = performance.now();
     });
 
-    // Button triggers flood for 8 seconds
     document.getElementById("floodBtn").addEventListener("click", ()=>{
       db.ref("flood").set(true);
       setTimeout(()=>db.ref("flood").set(false), 8000);
@@ -206,11 +216,10 @@
       if(keys["d"]){player.position.x+=0.05;moved=true;}
       if(moved) playerRef.update({x:player.position.x,y:player.position.y,z:player.position.z});
 
-      // Animate flood rising and falling
       if(floodActive){
-        const t = (performance.now()-floodStart)/8000; // 0 → 1
+        const t = (performance.now()-floodStart)/8000;
         if(t<1){
-          water.position.y = Math.sin(t*Math.PI)*5; // rises then falls
+          water.position.y = Math.sin(t*Math.PI)*5;
         }
       } else {
         water.position.y = -10;
